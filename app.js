@@ -56,7 +56,7 @@ const KATEGORIE_LABEL = {
 function computeTotal(d) {
   return clamp0(d.einzelperson) + clamp0(d.erwachsene) + clamp0(d.kinder) + clamp0(d.familien) + clamp0(d.gruppen);
 }
-const STANDORT_LABEL = { neustadt: "Neustadt", lambrecht: "Lambrecht" };
+const STANDORT_LABEL = { neustadt: "Neustadt" };
 const LS_KEY = "kb_session_v1";
 
 function todayISO() {
@@ -366,7 +366,7 @@ async function startSession() {
   const wagenAuswahl = Array.from(selectedWagen);
 
   if (!fahrtag) { showSetupError("Bitte einen Fahrtag wählen."); return; }
-  if (!selectedStandort) { showSetupError("Bitte Neustadt oder Lambrecht wählen."); return; }
+  if (!selectedStandort) { showSetupError("Bitte Neustadt wählen."); return; }
   if (!sitzplaetze || sitzplaetze < 1) { showSetupError("Bitte mindestens einen Wagen auswählen oder eine abweichende Sitzplatzzahl eingeben."); return; }
 
   startBtn.disabled = true;
