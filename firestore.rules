@@ -17,8 +17,8 @@ service cloud.firestore {
       // Zählstände werden per increment()/updateDoc laufend aktualisiert
       allow update: if request.auth != null;
 
-      // Fahrten werden nie gelöscht, nur zurückgesetzt (Zählstände auf 0)
-      allow delete: if false;
+      // Fahrten können über die App gelöscht werden (inkl. ihres Aktivitätsprotokolls)
+      allow delete: if request.auth != null;
 
       // Live-Aktivitätsprotokoll je Fahrt
       match /ereignisse/{eventId} {

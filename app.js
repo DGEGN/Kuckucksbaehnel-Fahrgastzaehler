@@ -19,13 +19,12 @@ import {
 // Firestore-Sicherheitsregeln (siehe firestore.rules / README.md).
 // ---------------------------------------------------------
 const firebaseConfig = {
-  apiKey: "AIzaSyCpfHTMh8zx2hmcxjF-ayIjW0lFtJcBtSM",
-  authDomain: "kuckuck-fahrkarten.firebaseapp.com",
-  databaseURL: "https://kuckuck-fahrkarten-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "kuckuck-fahrkarten",
-  storageBucket: "kuckuck-fahrkarten.firebasestorage.app",
-  messagingSenderId: "732559401683",
-  appId: "1:732559401683:web:dbfb8ef56c85c73de46a26"
+  apiKey: "DEIN_API_KEY",
+  authDomain: "DEIN_PROJEKT.firebaseapp.com",
+  projectId: "DEIN_PROJEKT",
+  storageBucket: "DEIN_PROJEKT.appspot.com",
+  messagingSenderId: "DEINE_SENDER_ID",
+  appId: "DEINE_APP_ID"
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -87,13 +86,10 @@ function clamp0(n) { return Math.max(0, n || 0); }
 // z. B. "assets/wagen/mein-foto.jpg"). Reihenfolge = Anzeigereihenfolge.
 // ---------------------------------------------------------
 const WAGEN = [
-  { id: "wageen1", name: "12240", sitzplaetze: 44, bild: "assets/wagen/12240.jpg" },
-  { id: "wagen2", name: "11150", sitzplaetze: 72, bild: "assets/wagen/11150.jpg" },
-  { id: "wagen3", name: "11082", sitzplaetze: 72, bild: "assets/wagen/11082.jpg" },
-  { id: "wagen4", name: "2455", sitzplaetze: 70, bild: "assets/wagen/2455.jpg" },
-  { id: "wagen5", name: "4918", sitzplaetze: 88, bild: "assets/wagen/4918.jpg" },
-  { id: "wagen6", name: "82813", sitzplaetze: 53, bild: "assets/wagen/82813.jpg" },
-  { id: "wagen7", name: "85034", sitzplaetze: 56, bild: "assets/wagen/85034.jpg" }
+  { id: "wagen1", name: "Wagen 1", sitzplaetze: 24, bild: "assets/wagen/wagen1.svg" },
+  { id: "wagen2", name: "Wagen 2", sitzplaetze: 28, bild: "assets/wagen/wagen2.svg" },
+  { id: "wagen3", name: "Wagen 3", sitzplaetze: 32, bild: "assets/wagen/wagen3.svg" },
+  { id: "wagen4", name: "Aussichtswagen", sitzplaetze: 20, bild: "assets/wagen/wagen4.svg" }
 ];
 let selectedWagen = new Set();
 
@@ -277,10 +273,14 @@ function renderExistingTrips(snap) {
     const d = docSnap.data();
     const total = computeTotal(d);
     const seats = clamp0(d.sitzplaetze);
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "trip-item";
-    btn.innerHTML = `
+
+    const item = document.createElement("div");
+    item.className = "trip-item";
+
+    const joinBtn = document.createElement("button");
+    joinBtn.type = "button";
+    joinBtn.className = "trip-item-join";
+    joinBtn.innerHTML = `
       <span class="trip-item-main">
         <span class="trip-item-date">${formatDateDE(d.fahrtag)}</span>
         <span class="trip-item-standort">${STANDORT_LABEL[d.standort] || d.standort}</span>
@@ -288,9 +288,44 @@ function renderExistingTrips(snap) {
       <span class="trip-item-stats">${total} / ${seats} Plätze</span>
       <span class="trip-item-arrow">›</span>
     `;
-    btn.addEventListener("click", () => joinExistingFahrt(docSnap.id, d));
-    existingTripsList.appendChild(btn);
+    joinBtn.addEventListener("click", () => joinExistingFahrt(docSnap.id, d));
+
+    const delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "trip-item-delete";
+    delBtn.setAttribute("aria-label", "Fahrt löschen");
+    delBtn.textContent = "🗑";
+    delBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      confirmDeleteFahrt(docSnap.id, d);
+    });
+
+    item.appendChild(joinBtn);
+    item.appendChild(delBtn);
+    existingTripsList.appendChild(item);
   });
+}
+
+function confirmDeleteFahrt(docId, data) {
+  const label = `${formatDateDE(data.fahrtag)} (${STANDORT_LABEL[data.standort] || data.standort})`;
+  openConfirm(
+    `Fahrt vom ${label} wirklich löschen? Alle Zählungen dieser Fahrt gehen dabei unwiderruflich verloren.`,
+    () => deleteFahrt(docId),
+    "Ja, löschen"
+  );
+}
+
+async function deleteFahrt(docId) {
+  try {
+    await authReady;
+    const ref = doc(db, "fahrten", docId);
+    const evSnap = await getDocs(collection(ref, "ereignisse"));
+    await Promise.all(evSnap.docs.map((d) => deleteDoc(d.ref)));
+    await deleteDoc(ref);
+    showToast("Fahrt gelöscht.");
+  } catch (err) {
+    showToast("Fehler beim Löschen: " + err.message);
+  }
 }
 
 async function joinExistingFahrt(docId, data) {
@@ -533,8 +568,9 @@ function exportCsv() {
 // ---------------------------------------------------------
 // Reset-Bestätigung
 // ---------------------------------------------------------
-function openConfirm(text, onOk) {
+function openConfirm(text, onOk, okLabel = "Ja, zurücksetzen") {
   confirmText.textContent = text;
+  confirmOk.textContent = okLabel;
   confirmDialog.classList.remove("hidden");
   const handler = () => { confirmDialog.classList.add("hidden"); confirmOk.removeEventListener("click", handler); onOk(); };
   confirmOk.addEventListener("click", handler);

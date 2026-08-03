@@ -263,20 +263,41 @@ input { font-family: var(--font-body); }
 
 .trip-item {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  align-items: stretch;
   width: 100%;
   background: #fff;
   border: 1px solid var(--paper-dark);
   border-radius: 8px;
+  overflow: hidden;
+}
+
+.trip-item-join {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  background: none;
   padding: 10px 12px;
   text-align: left;
-  transition: transform 0.06s ease, background 0.06s ease;
+  transition: background 0.06s ease;
 }
-.trip-item:hover { background: var(--paper-edge); }
-.trip-item:active { transform: scale(0.98); }
+.trip-item-join:hover { background: var(--paper-edge); }
+.trip-item-join:active { background: var(--paper-dark); }
 
-.trip-item-main { display: flex; flex-direction: column; gap: 2px; flex: 1; }
+.trip-item-delete {
+  width: 42px;
+  flex-shrink: 0;
+  background: none;
+  border-left: 1px dashed var(--paper-dark);
+  color: var(--alert);
+  font-size: 1rem;
+  transition: background 0.06s ease;
+}
+.trip-item-delete:hover { background: #f3d9d2; }
+.trip-item-delete:active { background: #e8c2b8; }
+
+.trip-item-main { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
 .trip-item-date { font-family: var(--font-mono); font-weight: 700; color: var(--ink); font-size: 0.92rem; }
 .trip-item-standort { font-size: 0.74rem; color: var(--sandstone); text-transform: uppercase; letter-spacing: 0.04em; }
 .trip-item-stats { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-soft); white-space: nowrap; }
