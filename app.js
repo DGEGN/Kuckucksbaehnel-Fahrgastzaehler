@@ -87,10 +87,13 @@ function clamp0(n) { return Math.max(0, n || 0); }
 // z. B. "assets/wagen/mein-foto.jpg"). Reihenfolge = Anzeigereihenfolge.
 // ---------------------------------------------------------
 const WAGEN = [
-  { id: "wagen1", name: "Wagen 1", sitzplaetze: 24, bild: "assets/wagen/wagen1.svg" },
-  { id: "wagen2", name: "Wagen 2", sitzplaetze: 28, bild: "assets/wagen/wagen2.svg" },
-  { id: "wagen3", name: "Wagen 3", sitzplaetze: 32, bild: "assets/wagen/wagen3.svg" },
-  { id: "wagen4", name: "Aussichtswagen", sitzplaetze: 20, bild: "assets/wagen/wagen4.svg" }
+  { id: "wageen1", name: "12240", sitzplaetze: 44, bild: "assets/wagen/12240.jpg" },
+  { id: "wagen2", name: "11150", sitzplaetze: 72, bild: "assets/wagen/11150.jpg" },
+  { id: "wagen3", name: "11082", sitzplaetze: 72, bild: "assets/wagen/11082.jpg" },
+  { id: "wagen4", name: "2455", sitzplaetze: 70, bild: "assets/wagen/2455.jpg" },
+  { id: "wagen5", name: "4918", sitzplaetze: 88, bild: "assets/wagen/4918.jpg" },
+  { id: "wagen6", name: "82813", sitzplaetze: 53, bild: "assets/wagen/82813.jpg" },
+  { id: "wagen7", name: "85034", sitzplaetze: 56, bild: "assets/wagen/85034.jpg" }
 ];
 let selectedWagen = new Set();
 
