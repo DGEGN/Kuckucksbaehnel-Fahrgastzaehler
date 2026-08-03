@@ -51,12 +51,18 @@
       </div>
 
       <div class="field">
-        <label for="sitzplaetze">Verfügbare Sitzplätze im Zug</label>
-        <input type="number" id="sitzplaetze" min="1" step="1" inputmode="numeric" placeholder="z. B. 80" required>
-        <div class="chip-row" id="seatChips">
-          <button type="button" class="chip" data-seats="60">60</button>
-          <button type="button" class="chip" data-seats="80">80</button>
-          <button type="button" class="chip" data-seats="120">120</button>
+        <label>Wagen auswählen</label>
+        <p class="field-hint">Tippe alle Wagen an, die heute im Zug mitfahren – die Sitzplatzzahl wird automatisch summiert.</p>
+        <div id="wagenGrid" class="wagen-grid"></div>
+        <div class="wagen-total">
+          <span>Sitzplätze gesamt</span>
+          <span id="wagenTotalSeats" class="wagen-total-value">0</span>
+        </div>
+        <button type="button" class="card-link" id="toggleSeatOverride">abweichende Gesamtzahl…</button>
+        <input type="number" id="sitzplaetze" class="hidden" min="0" step="1">
+        <div id="seatOverrideField" class="field seat-override hidden">
+          <label for="sitzplaetzeOverride">Sitzplätze manuell festlegen</label>
+          <input type="number" id="sitzplaetzeOverride" min="1" step="1" inputmode="numeric" placeholder="z. B. 70">
         </div>
       </div>
 

@@ -19,13 +19,12 @@ import {
 // Firestore-Sicherheitsregeln (siehe firestore.rules / README.md).
 // ---------------------------------------------------------
 const firebaseConfig = {
-  apiKey: "AIzaSyCpfHTMh8zx2hmcxjF-ayIjW0lFtJcBtSM",
-  authDomain: "kuckuck-fahrkarten.firebaseapp.com",
-  databaseURL: "https://kuckuck-fahrkarten-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "kuckuck-fahrkarten",
-  storageBucket: "kuckuck-fahrkarten.firebasestorage.app",
-  messagingSenderId: "732559401683",
-  appId: "1:732559401683:web:dbfb8ef56c85c73de46a26"
+  apiKey: "DEIN_API_KEY",
+  authDomain: "DEIN_PROJEKT.firebaseapp.com",
+  projectId: "DEIN_PROJEKT",
+  storageBucket: "DEIN_PROJEKT.appspot.com",
+  messagingSenderId: "DEINE_SENDER_ID",
+  appId: "DEINE_APP_ID"
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -80,6 +79,21 @@ function formatTimeDE(ts) {
 function clamp0(n) { return Math.max(0, n || 0); }
 
 // ---------------------------------------------------------
+// WAGEN-KATALOG
+// ---------------------------------------------------------
+// Hier die echten Wagen des Kuckucks-Bähnel eintragen: Name, Sitzplätze
+// und ein Bild (SVG-Platzhalter aus assets/wagen/ oder eigenes Foto,
+// z. B. "assets/wagen/mein-foto.jpg"). Reihenfolge = Anzeigereihenfolge.
+// ---------------------------------------------------------
+const WAGEN = [
+  { id: "wagen1", name: "Wagen 1", sitzplaetze: 24, bild: "assets/wagen/wagen1.svg" },
+  { id: "wagen2", name: "Wagen 2", sitzplaetze: 28, bild: "assets/wagen/wagen2.svg" },
+  { id: "wagen3", name: "Wagen 3", sitzplaetze: 32, bild: "assets/wagen/wagen3.svg" },
+  { id: "wagen4", name: "Aussichtswagen", sitzplaetze: 20, bild: "assets/wagen/wagen4.svg" }
+];
+let selectedWagen = new Set();
+
+// ---------------------------------------------------------
 // DOM-Referenzen
 // ---------------------------------------------------------
 const el = (id) => document.getElementById(id);
@@ -89,7 +103,11 @@ const appScreen = el("app");
 const fahrtagInput = el("fahrtag");
 const standortGroup = el("standortGroup");
 const sitzplaetzeInput = el("sitzplaetze");
-const seatChips = el("seatChips");
+const wagenGrid = el("wagenGrid");
+const wagenTotalSeatsEl = el("wagenTotalSeats");
+const toggleSeatOverrideBtn = el("toggleSeatOverride");
+const seatOverrideField = el("seatOverrideField");
+const sitzplaetzeOverrideInput = el("sitzplaetzeOverride");
 const kasseInput = el("kasseInput");
 const startBtn = el("startBtn");
 const setupInfo = el("setupInfo");
@@ -167,7 +185,6 @@ function initSetupScreen() {
   try { saved = JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch (e) { /* ignore */ }
   if (saved) {
     if (saved.standort) selectStandort(saved.standort);
-    if (saved.sitzplaetze) sitzplaetzeInput.value = saved.sitzplaetze;
     if (saved.kasse) kasseInput.value = saved.kasse;
   }
 
@@ -175,18 +192,14 @@ function initSetupScreen() {
     btn.addEventListener("click", () => selectStandort(btn.dataset.standort));
   });
 
-  seatChips.querySelectorAll(".chip").forEach((chip) => {
-    chip.addEventListener("click", () => {
-      sitzplaetzeInput.value = chip.dataset.seats;
-      seatChips.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
-      chip.classList.add("active");
-    });
+  renderWagenGrid();
+
+  toggleSeatOverrideBtn.addEventListener("click", () => {
+    const visible = seatOverrideField.classList.toggle("hidden") === false;
+    toggleSeatOverrideBtn.textContent = visible ? "abweichende Gesamtzahl ausblenden" : "abweichende Gesamtzahl…";
+    if (!visible) { sitzplaetzeOverrideInput.value = ""; updateWagenTotal(); }
   });
-  sitzplaetzeInput.addEventListener("input", () => {
-    seatChips.querySelectorAll(".chip").forEach((c) => {
-      c.classList.toggle("active", c.dataset.seats === sitzplaetzeInput.value);
-    });
-  });
+  sitzplaetzeOverrideInput.addEventListener("input", updateWagenTotal);
 
   startBtn.addEventListener("click", startSession);
   toggleNewTripBtn.addEventListener("click", () => setNewTripVisible(!newTripVisible));
@@ -198,6 +211,44 @@ function setNewTripVisible(visible) {
   newTripVisible = visible;
   newTripForm.classList.toggle("hidden", !visible);
   toggleNewTripBtn.textContent = visible ? "Abbrechen" : "+ Neue Fahrt anlegen";
+}
+
+function renderWagenGrid() {
+  wagenGrid.innerHTML = "";
+  WAGEN.forEach((w) => {
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = "wagen-tile";
+    tile.dataset.wagen = w.id;
+    tile.innerHTML = `
+      <span class="wagen-check">✓</span>
+      <img class="wagen-img" src="${w.bild}" alt="${escapeHtml(w.name)}">
+      <span class="wagen-name">${escapeHtml(w.name)}</span>
+      <span class="wagen-seats">${w.sitzplaetze} Plätze</span>
+    `;
+    tile.addEventListener("click", () => toggleWagenTile(w.id, tile));
+    wagenGrid.appendChild(tile);
+  });
+  updateWagenTotal();
+}
+
+function toggleWagenTile(id, tile) {
+  if (selectedWagen.has(id)) selectedWagen.delete(id);
+  else selectedWagen.add(id);
+  tile.classList.toggle("selected", selectedWagen.has(id));
+  updateWagenTotal();
+}
+
+function updateWagenTotal() {
+  const overrideVal = parseInt(sitzplaetzeOverrideInput.value, 10);
+  let total;
+  if (!seatOverrideField.classList.contains("hidden") && overrideVal > 0) {
+    total = overrideVal;
+  } else {
+    total = WAGEN.filter((w) => selectedWagen.has(w.id)).reduce((sum, w) => sum + w.sitzplaetze, 0);
+  }
+  wagenTotalSeatsEl.textContent = total;
+  sitzplaetzeInput.value = total;
 }
 
 async function subscribeToExistingTrips() {
@@ -269,10 +320,11 @@ async function startSession() {
   const fahrtag = fahrtagInput.value;
   const sitzplaetze = parseInt(sitzplaetzeInput.value, 10);
   const kasse = kasseInput.value.trim() || "Kasse";
+  const wagenAuswahl = Array.from(selectedWagen);
 
   if (!fahrtag) { showSetupError("Bitte einen Fahrtag wählen."); return; }
   if (!selectedStandort) { showSetupError("Bitte Neustadt oder Lambrecht wählen."); return; }
-  if (!sitzplaetze || sitzplaetze < 1) { showSetupError("Bitte eine gültige Sitzplatzanzahl eingeben."); return; }
+  if (!sitzplaetze || sitzplaetze < 1) { showSetupError("Bitte mindestens einen Wagen auswählen oder eine abweichende Sitzplatzzahl eingeben."); return; }
 
   startBtn.disabled = true;
   startBtn.textContent = "Verbinde…";
@@ -285,13 +337,13 @@ async function startSession() {
 
     if (snap.exists()) {
       const data = snap.data();
-      if (data.sitzplaetze !== sitzplaetze) {
-        await updateDoc(ref, { sitzplaetze, aktualisiert: serverTimestamp() });
+      if (data.sitzplaetze !== sitzplaetze || wagenAuswahl.length) {
+        await updateDoc(ref, { sitzplaetze, wagen: wagenAuswahl, aktualisiert: serverTimestamp() });
       }
       showSetupInfo(`Fahrt gefunden – bisher ${computeTotal(data)} Fahrgäste gezählt. Du zählst live mit.`);
     } else {
       await setDoc(ref, {
-        fahrtag, standort: selectedStandort, sitzplaetze,
+        fahrtag, standort: selectedStandort, sitzplaetze, wagen: wagenAuswahl,
         einzelperson: 0, familien: 0, gruppen: 0,
         erstellt: serverTimestamp(), aktualisiert: serverTimestamp()
       });
@@ -336,8 +388,12 @@ function leaveApp() {
   showSetupError(""); showSetupInfo("");
   fahrtagInput.value = session?.fahrtag || todayISO();
   if (session?.standort) selectStandort(session.standort);
-  sitzplaetzeInput.value = session?.sitzplaetze || "";
   kasseInput.value = session?.kasse || "";
+  selectedWagen = new Set();
+  seatOverrideField.classList.add("hidden");
+  sitzplaetzeOverrideInput.value = "";
+  toggleSeatOverrideBtn.textContent = "abweichende Gesamtzahl…";
+  renderWagenGrid();
   setNewTripVisible(false);
   subscribeToExistingTrips();
 }
