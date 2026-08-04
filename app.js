@@ -56,7 +56,7 @@ const KATEGORIE_LABEL = {
 function computeTotal(d) {
   return clamp0(d.einzelperson) + clamp0(d.erwachsene) + clamp0(d.kinder) + clamp0(d.familien) + clamp0(d.gruppen);
 }
-const STANDORT_LABEL = { neustadt: "Neustadt" };
+const STANDORT_LABEL = { neustadt: "Neustadt", lambrecht: "Lambrecht" };
 const LS_KEY = "kb_session_v1";
 
 function todayISO() {
@@ -104,6 +104,9 @@ const el = (id) => document.getElementById(id);
 
 const setupScreen = el("setup");
 const appScreen = el("app");
+const viewerScreen = el("viewer");
+const rolleGroup = el("rolleGroup");
+const rolleHint = el("rolleHint");
 const fahrtagInput = el("fahrtag");
 const standortGroup = el("standortGroup");
 const sitzplaetzeInput = el("sitzplaetze");
@@ -119,6 +122,7 @@ const setupError = el("setupError");
 const existingTripsList = el("existingTripsList");
 const toggleNewTripBtn = el("toggleNewTrip");
 const newTripForm = el("newTripForm");
+const newTripDivider = el("newTripDivider");
 
 const fahrtagLabel = el("fahrtagLabel");
 const standortLabel = el("standortLabel");
@@ -131,6 +135,8 @@ const totalTodayEl = el("totalToday");
 const seatsTotalEl = el("seatsTotal");
 const seatsFreeEl = el("seatsFree");
 const seatsFreeLabel = el("seatsFreeLabel");
+const seatsWarningBadge = el("seatsWarningBadge");
+const editSeatsBtn = el("editSeatsBtn");
 
 const countEinzelperson = el("countEinzelperson");
 const countFamilien = el("countFamilien");
@@ -139,6 +145,9 @@ const countGruppen = el("countGruppen");
 const cardEinzelperson = el("cardEinzelperson");
 const cardFamilie = el("cardFamilie");
 const familieAndereAnzahl = el("familieAndereAnzahl");
+const minusEinzelperson = el("minusEinzelperson");
+const minusFamilien = el("minusFamilien");
+const minusGruppen = el("minusGruppen");
 
 const gruppeMinus = el("gruppeMinus");
 const gruppePlus = el("gruppePlus");
@@ -163,10 +172,31 @@ const numpadDisplay = el("numpadDisplay");
 const numpadOk = el("numpadOk");
 const numpadCancel = el("numpadCancel");
 
+// Viewer-Screen (Betrachter)
+const viewerChangeSessionBtn = el("viewerChangeSession");
+const viewerFahrtagLabel = el("viewerFahrtagLabel");
+const viewerStandortLabel = el("viewerStandortLabel");
+const viewerConnStatus = el("viewerConnStatus");
+const viewerOccupiedEl = el("viewerOccupied");
+const viewerTotalSeatsEl = el("viewerTotalSeats");
+const viewerFreeEl = el("viewerFree");
+const viewerFreeLabel = el("viewerFreeLabel");
+const viewerWarning = el("viewerWarning");
+
+// Wagen-/Sitzplatz-Nachbearbeitung
+const wagenEditOverlay = el("wagenEditOverlay");
+const wagenEditGrid = el("wagenEditGrid");
+const wagenEditTotalSeatsEl = el("wagenEditTotalSeats");
+const toggleSeatEditOverrideBtn = el("toggleSeatEditOverride");
+const seatEditOverrideField = el("seatEditOverrideField");
+const sitzplaetzeEditOverrideInput = el("sitzplaetzeEditOverride");
+const wagenEditCancel = el("wagenEditCancel");
+const wagenEditSave = el("wagenEditSave");
+
 // ---------------------------------------------------------
 // Zustand
 // ---------------------------------------------------------
-let session = null;        // {fahrtag, standort, kasse, sitzplaetze}
+let session = null;        // {fahrtag, standort, kasse, sitzplaetze, rolle}
 let docRef = null;
 let unsubDoc = null;
 let unsubActivity = null;
@@ -174,10 +204,13 @@ let unsubHistory = null;
 let unsubSetupList = null;
 let newTripVisible = false;
 let selectedStandort = null;
+let selectedRolle = "bearbeiter";
 let pendingGruppe = 1;
 let numpadValue = "";
 let numpadOnConfirm = null;
 let latestHistoryRows = [];
+let currentTripData = null;   // letzter bekannter Snapshot-Inhalt der aktiven Fahrt
+let selectedWagenEdit = new Set();
 
 // ===========================================================
 // SETUP SCREEN
@@ -190,7 +223,15 @@ function initSetupScreen() {
   if (saved) {
     if (saved.standort) selectStandort(saved.standort);
     if (saved.kasse) kasseInput.value = saved.kasse;
+    if (saved.rolle) selectRolle(saved.rolle);
+    else selectRolle("bearbeiter");
+  } else {
+    selectRolle("bearbeiter");
   }
+
+  rolleGroup.querySelectorAll(".toggle-btn").forEach((btn) => {
+    btn.addEventListener("click", () => selectRolle(btn.dataset.rolle));
+  });
 
   standortGroup.querySelectorAll(".toggle-btn").forEach((btn) => {
     btn.addEventListener("click", () => selectStandort(btn.dataset.standort));
@@ -255,6 +296,92 @@ function updateWagenTotal() {
   sitzplaetzeInput.value = total;
 }
 
+// ---------------------------------------------------------
+// Nachträgliche Wagen-/Sitzplatz-Bearbeitung (im laufenden Betrieb)
+// ---------------------------------------------------------
+function openWagenEdit() {
+  if (!currentTripData) return;
+  selectedWagenEdit = new Set(Array.isArray(currentTripData.wagen) ? currentTripData.wagen : []);
+  const summeAusWagen = WAGEN.filter((w) => selectedWagenEdit.has(w.id)).reduce((s, w) => s + w.sitzplaetze, 0);
+  const aktuelleSitzplaetze = clamp0(currentTripData.sitzplaetze);
+
+  renderWagenEditGrid();
+
+  if (selectedWagenEdit.size === 0 || summeAusWagen !== aktuelleSitzplaetze) {
+    // Aktuelle Sitzplatzzahl lässt sich nicht (mehr) aus den Wagen ableiten -> als Override anzeigen
+    seatEditOverrideField.classList.remove("hidden");
+    toggleSeatEditOverrideBtn.textContent = "abweichende Gesamtzahl ausblenden";
+    sitzplaetzeEditOverrideInput.value = aktuelleSitzplaetze || "";
+  } else {
+    seatEditOverrideField.classList.add("hidden");
+    toggleSeatEditOverrideBtn.textContent = "abweichende Gesamtzahl…";
+    sitzplaetzeEditOverrideInput.value = "";
+  }
+  updateWagenEditTotal();
+  wagenEditOverlay.classList.remove("hidden");
+}
+
+function closeWagenEdit() { wagenEditOverlay.classList.add("hidden"); }
+
+function renderWagenEditGrid() {
+  wagenEditGrid.innerHTML = "";
+  WAGEN.forEach((w) => {
+    const tile = document.createElement("button");
+    tile.type = "button";
+    tile.className = "wagen-tile" + (selectedWagenEdit.has(w.id) ? " selected" : "");
+    tile.innerHTML = `
+      <span class="wagen-check">✓</span>
+      <img class="wagen-img" src="${w.bild}" alt="${escapeHtml(w.name)}">
+      <span class="wagen-name">${escapeHtml(w.name)}</span>
+      <span class="wagen-seats">${w.sitzplaetze} Plätze</span>
+    `;
+    tile.addEventListener("click", () => {
+      if (selectedWagenEdit.has(w.id)) selectedWagenEdit.delete(w.id);
+      else selectedWagenEdit.add(w.id);
+      tile.classList.toggle("selected", selectedWagenEdit.has(w.id));
+      updateWagenEditTotal();
+    });
+    wagenEditGrid.appendChild(tile);
+  });
+}
+
+function updateWagenEditTotal() {
+  const overrideVal = parseInt(sitzplaetzeEditOverrideInput.value, 10);
+  let total;
+  if (!seatEditOverrideField.classList.contains("hidden") && overrideVal > 0) {
+    total = overrideVal;
+  } else {
+    total = WAGEN.filter((w) => selectedWagenEdit.has(w.id)).reduce((sum, w) => sum + w.sitzplaetze, 0);
+  }
+  wagenEditTotalSeatsEl.textContent = total;
+  return total;
+}
+
+async function saveWagenEdit() {
+  const neueSitzplaetze = updateWagenEditTotal();
+  if (!neueSitzplaetze || neueSitzplaetze < 1) {
+    showToast("Bitte mindestens einen Wagen auswählen oder eine abweichende Zahl eintragen.");
+    return;
+  }
+  const bisherige = clamp0(currentTripData?.sitzplaetze);
+  const wagenAuswahl = Array.from(selectedWagenEdit);
+
+  closeWagenEdit();
+  openDoubleConfirm(
+    `Sitzplatzanzahl von ${bisherige} auf ${neueSitzplaetze} ändern?`,
+    `Wirklich sicher? Diese Änderung gilt sofort für alle Kassen dieser Fahrt.`,
+    async () => {
+      try {
+        await updateDoc(docRef, { sitzplaetze: neueSitzplaetze, wagen: wagenAuswahl, aktualisiert: serverTimestamp() });
+        showToast("Sitzplatzanzahl aktualisiert.");
+      } catch (err) {
+        showToast("Fehler: " + err.message);
+      }
+    },
+    "Ja, ändern"
+  );
+}
+
 async function subscribeToExistingTrips() {
   existingTripsList.innerHTML = '<p class="trip-empty">Lade Fahrten…</p>';
   try {
@@ -269,7 +396,7 @@ async function subscribeToExistingTrips() {
 function renderExistingTrips(snap) {
   if (snap.empty) {
     existingTripsList.innerHTML = '<p class="trip-empty">Noch keine Fahrten angelegt.</p>';
-    setNewTripVisible(true);
+    if (selectedRolle !== "betrachter") setNewTripVisible(true);
     return;
   }
   existingTripsList.innerHTML = "";
@@ -293,19 +420,21 @@ function renderExistingTrips(snap) {
       <span class="trip-item-arrow">›</span>
     `;
     joinBtn.addEventListener("click", () => joinExistingFahrt(docSnap.id, d));
-
-    const delBtn = document.createElement("button");
-    delBtn.type = "button";
-    delBtn.className = "trip-item-delete";
-    delBtn.setAttribute("aria-label", "Fahrt löschen");
-    delBtn.textContent = "🗑";
-    delBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      confirmDeleteFahrt(docSnap.id, d);
-    });
-
     item.appendChild(joinBtn);
-    item.appendChild(delBtn);
+
+    if (selectedRolle !== "betrachter") {
+      const delBtn = document.createElement("button");
+      delBtn.type = "button";
+      delBtn.className = "trip-item-delete";
+      delBtn.setAttribute("aria-label", "Fahrt löschen");
+      delBtn.textContent = "🗑";
+      delBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        confirmDeleteFahrt(docSnap.id, d);
+      });
+      item.appendChild(delBtn);
+    }
+
     existingTripsList.appendChild(item);
   });
 }
@@ -337,14 +466,29 @@ async function joinExistingFahrt(docId, data) {
   const kasse = kasseInput.value.trim() || "Kasse";
   try {
     await authReady;
-    session = { fahrtag: data.fahrtag, standort: data.standort, kasse, sitzplaetze: clamp0(data.sitzplaetze) };
+    session = { fahrtag: data.fahrtag, standort: data.standort, kasse, sitzplaetze: clamp0(data.sitzplaetze), rolle: selectedRolle };
     docRef = doc(db, "fahrten", docId);
-    localStorage.setItem(LS_KEY, JSON.stringify({ kasse }));
+    localStorage.setItem(LS_KEY, JSON.stringify({ kasse, rolle: selectedRolle }));
     if (unsubSetupList) { unsubSetupList(); unsubSetupList = null; }
     enterApp();
   } catch (err) {
     showSetupError("Fehler: " + err.message);
   }
+}
+
+function selectRolle(value) {
+  selectedRolle = value;
+  rolleGroup.querySelectorAll(".toggle-btn").forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.rolle === value);
+  });
+  const istBetrachter = value === "betrachter";
+  rolleHint.textContent = istBetrachter
+    ? "Betrachter sieht nur die Sitzplatzzahlen einer Fahrt, kann aber nichts ändern."
+    : "Bearbeiter kann zählen, Wagen zuordnen und Fahrten anlegen.";
+  // Betrachter legen keine neuen Fahrten an, nur bestehende ansehen
+  newTripDivider.classList.toggle("hidden", istBetrachter);
+  toggleNewTripBtn.classList.toggle("hidden", istBetrachter);
+  if (istBetrachter) setNewTripVisible(false);
 }
 
 function selectStandort(value) {
@@ -366,7 +510,7 @@ async function startSession() {
   const wagenAuswahl = Array.from(selectedWagen);
 
   if (!fahrtag) { showSetupError("Bitte einen Fahrtag wählen."); return; }
-  if (!selectedStandort) { showSetupError("Bitte Neustadt wählen."); return; }
+  if (!selectedStandort) { showSetupError("Bitte Neustadt oder Lambrecht wählen."); return; }
   if (!sitzplaetze || sitzplaetze < 1) { showSetupError("Bitte mindestens einen Wagen auswählen oder eine abweichende Sitzplatzzahl eingeben."); return; }
 
   startBtn.disabled = true;
@@ -392,7 +536,7 @@ async function startSession() {
       });
     }
 
-    session = { fahrtag, standort: selectedStandort, kasse, sitzplaetze };
+    session = { fahrtag, standort: selectedStandort, kasse, sitzplaetze, rolle: "bearbeiter" };
     docRef = ref;
     localStorage.setItem(LS_KEY, JSON.stringify(session));
     if (unsubSetupList) { unsubSetupList(); unsubSetupList = null; }
@@ -410,15 +554,23 @@ async function startSession() {
 // ===========================================================
 function enterApp() {
   setupScreen.classList.add("hidden");
-  appScreen.classList.remove("hidden");
 
-  fahrtagLabel.textContent = formatDateDE(session.fahrtag);
-  standortLabel.textContent = STANDORT_LABEL[session.standort] || session.standort;
-  kasseLabel.textContent = session.kasse;
+  if (session.rolle === "betrachter") {
+    appScreen.classList.add("hidden");
+    viewerScreen.classList.remove("hidden");
+    viewerFahrtagLabel.textContent = formatDateDE(session.fahrtag);
+    viewerStandortLabel.textContent = STANDORT_LABEL[session.standort] || session.standort;
+  } else {
+    viewerScreen.classList.add("hidden");
+    appScreen.classList.remove("hidden");
+    fahrtagLabel.textContent = formatDateDE(session.fahrtag);
+    standortLabel.textContent = STANDORT_LABEL[session.standort] || session.standort;
+    kasseLabel.textContent = session.kasse;
+    subscribeToActivity();
+    subscribeToHistory();
+  }
 
   subscribeToTrip();
-  subscribeToActivity();
-  subscribeToHistory();
 }
 
 function leaveApp() {
@@ -426,12 +578,15 @@ function leaveApp() {
   if (unsubActivity) unsubActivity();
   if (unsubHistory) unsubHistory();
   docRef = null;
+  currentTripData = null;
   appScreen.classList.add("hidden");
+  viewerScreen.classList.add("hidden");
   setupScreen.classList.remove("hidden");
   showSetupError(""); showSetupInfo("");
   fahrtagInput.value = session?.fahrtag || todayISO();
   if (session?.standort) selectStandort(session.standort);
   kasseInput.value = session?.kasse || "";
+  selectRolle(session?.rolle || "bearbeiter");
   selectedWagen = new Set();
   seatOverrideField.classList.add("hidden");
   sitzplaetzeOverrideInput.value = "";
@@ -441,12 +596,29 @@ function leaveApp() {
   subscribeToExistingTrips();
 }
 
+function warningLevelInfo(pct, free) {
+  if (free < 0 || pct >= 1) return { level: "100", text: "Nur noch Stehplätze" };
+  if (pct >= 0.75) return { level: "75", text: "≥ 75 % belegt" };
+  if (pct >= 0.5) return { level: "50", text: "≥ 50 % belegt" };
+  return { level: "0", text: "" };
+}
+
+function applyWarningClasses(el, level) {
+  el.classList.remove("level-50", "level-75", "level-100");
+  if (level !== "0") el.classList.add("level-" + level);
+}
+
 function subscribeToTrip() {
-  setConnStatus("connecting");
+  const setStatus = session.rolle === "betrachter"
+    ? (state) => applyConnStatus(viewerConnStatus, state)
+    : (state) => applyConnStatus(connStatus, state);
+
+  setStatus("connecting");
   unsubDoc = onSnapshot(docRef, (snap) => {
-    setConnStatus(snap.metadata.fromCache ? "offline" : "online");
+    setStatus(snap.metadata.fromCache ? "offline" : "online");
     if (!snap.exists()) return;
     const d = snap.data();
+    currentTripData = d;
     // "einzel" fasst die neue Einzelperson-Kategorie plus alte erwachsene/kinder
     // (falls diese Fahrt noch mit der Vorgängerversion gezählt wurde) zusammen.
     const einzel = clamp0(d.einzelperson) + clamp0(d.erwachsene) + clamp0(d.kinder);
@@ -454,25 +626,40 @@ function subscribeToTrip() {
     const total = computeTotal(d);
     const seats = clamp0(d.sitzplaetze);
     const free = seats - total;
+    const pct = seats > 0 ? total / seats : 0;
+    const info = warningLevelInfo(pct, free);
 
-    countEinzelperson.textContent = einzel;
-    countFamilien.textContent = fam;
-    countGruppen.textContent = grp;
-    totalTodayEl.textContent = total;
-    seatsTotalEl.textContent = seats;
-    seatsFreeEl.textContent = free;
-    seatsFreeLabel.textContent = free < 0 ? "überbucht" : "frei";
-    seatsBanner.classList.toggle("seats-warning", free <= 0);
+    if (session.rolle === "betrachter") {
+      viewerOccupiedEl.textContent = total;
+      viewerTotalSeatsEl.textContent = seats;
+      viewerFreeEl.textContent = free;
+      viewerFreeLabel.textContent = free < 0 ? "Überbucht" : "Frei";
+      applyWarningClasses(viewerScreen, info.level);
+      if (info.text) { viewerWarning.textContent = info.text; viewerWarning.classList.remove("hidden"); }
+      else viewerWarning.classList.add("hidden");
+    } else {
+      countEinzelperson.textContent = einzel;
+      countFamilien.textContent = fam;
+      countGruppen.textContent = grp;
+      totalTodayEl.textContent = total;
+      seatsTotalEl.textContent = seats;
+      seatsFreeEl.textContent = free;
+      seatsFreeLabel.textContent = free < 0 ? "überbucht" : "frei";
+      applyWarningClasses(seatsBanner, info.level);
+      if (info.text) { seatsWarningBadge.textContent = info.text; seatsWarningBadge.classList.remove("hidden"); }
+      else seatsWarningBadge.classList.add("hidden");
+    }
   }, (err) => {
-    setConnStatus("offline");
+    setStatus("offline");
     showToast("Verbindungsfehler: " + err.message);
   });
 }
 
-function setConnStatus(state) {
-  connStatus.className = "conn-status conn-" + state;
-  connStatus.textContent = state === "online" ? "live verbunden" : state === "offline" ? "keine Verbindung" : "verbinde…";
+function applyConnStatus(el, state) {
+  el.className = "conn-status conn-" + state;
+  el.textContent = state === "online" ? "live verbunden" : state === "offline" ? "keine Verbindung" : "verbinde…";
 }
+function setConnStatus(state) { applyConnStatus(connStatus, state); }
 
 async function addFahrgaeste(kategorie, delta) {
   if (!docRef || !delta) return;
@@ -581,11 +768,18 @@ function openConfirm(text, onOk, okLabel = "Ja, zurücksetzen") {
 }
 confirmCancel.addEventListener("click", () => confirmDialog.classList.add("hidden"));
 
+// Fragt zweimal nacheinander nach, für besonders folgenreiche Aktionen.
+function openDoubleConfirm(text1, text2, onOk, okLabel = "Ja") {
+  openConfirm(text1, () => {
+    openConfirm(text2, onOk, okLabel);
+  }, "Weiter");
+}
+
 async function resetTrip() {
   if (!docRef) return;
   try {
     await updateDoc(docRef, {
-      erwachsene: 0, kinder: 0, familien: 0, gruppen: 0, aktualisiert: serverTimestamp()
+      einzelperson: 0, erwachsene: 0, kinder: 0, familien: 0, gruppen: 0, aktualisiert: serverTimestamp()
     });
     const evSnap = await getDocs(collection(docRef, "ereignisse"));
     await Promise.all(evSnap.docs.map((d) => deleteDoc(d.ref)));
@@ -651,6 +845,27 @@ familieAndereAnzahl.addEventListener("click", () => {
   openNumpad("Familie – abweichende Personenzahl", 0, (n) => addFahrgaeste("familien", n));
 });
 
+function openEntfernenNumpad(kategorie, label, countEl) {
+  openNumpad(`${label} entfernen`, 0, (n) => {
+    const aktuell = parseInt(countEl.textContent, 10) || 0;
+    const menge = Math.min(n, aktuell);
+    if (menge <= 0) { showToast("Niemand zum Entfernen vorhanden."); return; }
+    addFahrgaeste(kategorie, -menge);
+  });
+}
+minusEinzelperson.addEventListener("click", (e) => {
+  e.stopPropagation();
+  openEntfernenNumpad("einzelperson", "Einzelpersonen", countEinzelperson);
+});
+minusFamilien.addEventListener("click", (e) => {
+  e.stopPropagation();
+  openEntfernenNumpad("familien", "Personen aus Familie", countFamilien);
+});
+minusGruppen.addEventListener("click", (e) => {
+  e.stopPropagation();
+  openEntfernenNumpad("gruppen", "Personen aus Gruppe", countGruppen);
+});
+
 function updateGruppeDisplay() { gruppeDisplay.textContent = pendingGruppe; }
 gruppeMinus.addEventListener("click", () => { pendingGruppe = Math.max(1, pendingGruppe - 1); updateGruppeDisplay(); });
 gruppePlus.addEventListener("click", () => { pendingGruppe = Math.min(999, pendingGruppe + 1); updateGruppeDisplay(); });
@@ -665,13 +880,33 @@ gruppeAdd.addEventListener("click", () => {
 
 undoLastBtn.addEventListener("click", undoLast);
 resetDayBtn.addEventListener("click", () => {
-  openConfirm("Zählung dieser Fahrt wirklich auf 0 zurücksetzen? Die Sitzplatzanzahl bleibt erhalten.", resetTrip);
+  openDoubleConfirm(
+    "Zählung dieser Fahrt wirklich auf 0 zurücksetzen? Die Sitzplatzanzahl bleibt erhalten.",
+    "Wirklich sicher? Alle bisherigen Zählungen dieser Fahrt gehen dabei unwiderruflich verloren.",
+    resetTrip,
+    "Ja, zurücksetzen"
+  );
 });
 exportCsvBtn.addEventListener("click", exportCsv);
 changeSessionBtn.addEventListener("click", leaveApp);
+viewerChangeSessionBtn.addEventListener("click", leaveApp);
 
-window.addEventListener("online", () => setConnStatus(docRef ? "online" : "connecting"));
-window.addEventListener("offline", () => setConnStatus("offline"));
+editSeatsBtn.addEventListener("click", openWagenEdit);
+wagenEditCancel.addEventListener("click", closeWagenEdit);
+wagenEditSave.addEventListener("click", saveWagenEdit);
+toggleSeatEditOverrideBtn.addEventListener("click", () => {
+  const visible = seatEditOverrideField.classList.toggle("hidden") === false;
+  toggleSeatEditOverrideBtn.textContent = visible ? "abweichende Gesamtzahl ausblenden" : "abweichende Gesamtzahl…";
+  if (!visible) sitzplaetzeEditOverrideInput.value = "";
+  updateWagenEditTotal();
+});
+sitzplaetzeEditOverrideInput.addEventListener("input", updateWagenEditTotal);
+
+window.addEventListener("online", () => { if (docRef) subscribeToTrip(); });
+window.addEventListener("offline", () => {
+  if (session?.rolle === "betrachter") applyConnStatus(viewerConnStatus, "offline");
+  else applyConnStatus(connStatus, "offline");
+});
 
 // ---------------------------------------------------------
 // Start

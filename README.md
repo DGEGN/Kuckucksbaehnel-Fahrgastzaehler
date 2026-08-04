@@ -6,6 +6,12 @@ direkt im Browser (HTML/CSS/JS), Daten liegen in Firebase Firestore und werden
 
 ## Funktionsweise
 
+- **Rollen**: Beim Start wählst du **Bearbeiter** (zählen, Wagen zuordnen,
+  Fahrten anlegen) oder **Betrachter 🔍** (sieht nur die drei
+  Sitzplatzzahlen einer Fahrt groß auf einem eigenen Bildschirm, kann aber
+  nichts verändern). Die Rollenwahl ist eine reine Anzeige-Umschaltung ohne
+  Passwortschutz – jeder kann sie frei wählen (siehe Sicherheitshinweis
+  unten).
 - **Start-Screen**: Bereits angelegte Fahrten werden als Liste angezeigt und
   können direkt angetippt werden – ohne erneute Eingabe von Fahrtag,
   Standort oder Sitzplätzen. Öffnen mehrere Kassen dieselbe Fahrt, zählen
@@ -20,18 +26,40 @@ direkt im Browser (HTML/CSS/JS), Daten liegen in Firebase Firestore und werden
   eigenen Wert per Ziffernblock eingeben.
 - **Gruppe**: Anzahl über **+ / −** oder den Ziffernblock einstellen, dann
   "Gruppe hinzufügen".
+- **"− entfernen"** bei jeder Kategorie: falls sich jemand verzählt hat,
+  öffnet sich der Ziffernblock, dort die Anzahl der zu entfernenden
+  Personen eingeben. Die Menge wird automatisch auf die aktuell gezählte
+  Anzahl begrenzt (kann nicht unter 0 fallen).
 - Oben werden **Fahrgäste gesamt**, **Sitzplätze** und **freie Plätze** live
-  angezeigt; bei Überbuchung wird die Leiste rot.
+  angezeigt (jetzt größer dargestellt); bei **50 %** und **75 %** Belegung
+  erscheint ein farbiger Warnhinweis neben der Sitzplatzzahl, bei **100 %**
+  wechselt er zu **"Nur noch Stehplätze"**.
+- **"Sitzplätze / Wagen nachträglich bearbeiten"**: Während der laufenden
+  Zählung lässt sich die Wagen-Zusammenstellung (und damit die
+  Sitzplatzzahl) noch ändern – z. B. wenn kurzfristig ein Wagen ausfällt.
+  Das erfordert eine **doppelte Bestätigung**, da es sich sofort auf alle
+  Kassen dieser Fahrt auswirkt.
 - **Live-Aktivität** zeigt jede Zählung mit Kasse/Uhrzeit, "Letzte Aktion
-  rückgängig" macht die zuletzt gespeicherte Zählung (egal von welcher Kasse)
-  rückgängig.
+  rückgängig" macht die zuletzt gespeicherte Zählung (egal von welcher
+  Kasse) rückgängig.
 - **Letzte Fahrten** listet die letzten 10 Fahrten (alle Standorte), mit
   CSV-Export.
-- In der Liste **„Fahrt beitreten"** kann jede Fahrt über das Papierkorb-Symbol
+- In der Liste "Fahrt beitreten" kann jede Fahrt über das Papierkorb-Symbol
   endgültig gelöscht werden (inkl. ihres Aktivitätsprotokolls) – mit
   Sicherheitsabfrage, da das nicht rückgängig gemacht werden kann.
-- **Zählung dieser Fahrt zurücksetzen** setzt nur die Fahrgastzahlen auf 0,
-  die Sitzplatzanzahl bleibt erhalten.
+  (Betrachter sehen dieses Symbol nicht.)
+- **Zählung dieser Fahrt zurücksetzen** setzt nur die Fahrgastzahlen auf 0
+  (die Sitzplatzanzahl bleibt erhalten) – ebenfalls mit **doppelter
+  Bestätigung**.
+
+### Sicherheitshinweis zu den Rollen
+
+Die Bearbeiter/Betrachter-Auswahl ist – wie besprochen – ausschließlich eine
+Anzeige-Umschaltung im Browser, **keine echte Zugriffskontrolle**. Jede
+Person mit dem App-Link kann jederzeit "Bearbeiter" wählen und zählen.
+Für eine echte Absicherung (z. B. verbindliche Benutzerkonten mit Login)
+wäre die optionale Erweiterung um echte Firebase-Benutzerprofile
+nötig – bei Bedarf gerne als nächsten Schritt umsetzen.
 
 ## 1. Firebase einrichten (du hast bereits ein Projekt)
 
