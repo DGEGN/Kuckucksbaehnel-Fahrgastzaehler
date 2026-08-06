@@ -56,7 +56,7 @@
           <button type="button" class="toggle-btn" data-rolle="bearbeiter">Bearbeiter</button>
           <button type="button" class="toggle-btn" data-rolle="betrachter">Betrachter 🔍</button>
         </div>
-        <p class="field-hint">Bearbeiter kann zählen und bearbeiten. Betrachter sieht nur die Sitzplatzzahlen. Später lässt sich das nicht mehr selbst ändern.</p>
+        <p class="field-hint">Bearbeiter zählt und bearbeitet, Betrachter sieht nur die Sitzplatzzahlen. Lässt sich später nicht mehr selbst ändern.</p>
       </div>
       <button id="registerBtn" class="btn btn-brass btn-block">Konto erstellen</button>
     </div>
@@ -74,7 +74,10 @@
     <p class="setup-sub">Kuckucks-Bähnel</p>
 
     <div class="field account-row">
-      <span id="accountLabel" class="account-label">Angemeldet als …</span>
+      <div class="account-info">
+        <span id="accountEmail" class="account-email">–</span>
+        <span id="accountRoleBadge" class="account-role-badge">Bearbeiter</span>
+      </div>
       <button type="button" id="logoutBtn" class="link-btn">Abmelden</button>
     </div>
 

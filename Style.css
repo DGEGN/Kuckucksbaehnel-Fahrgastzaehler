@@ -177,11 +177,18 @@ input { font-family: var(--font-body); }
   align-items: center;
   justify-content: space-between;
   background: var(--paper-edge);
-  border-radius: 6px;
-  padding: 8px 12px;
+  border: 1px solid var(--paper-dark);
+  border-radius: 8px;
+  padding: 10px 12px;
   gap: 10px;
 }
-.account-label {
+.account-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.account-email {
   font-size: 0.82rem;
   font-weight: 600;
   color: var(--ink-soft);
@@ -189,9 +196,23 @@ input { font-family: var(--font-body); }
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.account-role-badge {
+  flex-shrink: 0;
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 3px 9px;
+  border-radius: 20px;
+  background: var(--brass);
+  color: #241b0c;
+}
+.account-role-badge.betrachter { background: var(--forest); color: #f3ecda; }
 
-.auth-form { margin-top: 18px; }
-#authModeGroup { margin-bottom: 6px; }
+.auth-form { margin-top: 22px; }
+.auth-form .field:last-of-type { margin-bottom: 14px; }
+#authModeGroup { margin-bottom: 4px; }
+#forgotPasswordBtn { margin-top: 10px; }
 .toggle-btn {
   flex: 1;
   padding: 12px;
@@ -200,7 +221,9 @@ input { font-family: var(--font-body); }
   background: #fff;
   font-weight: 600;
   color: var(--ink-soft);
+  transition: border-color 0.1s ease, background 0.1s ease;
 }
+.toggle-btn:hover:not(.active) { border-color: var(--brass); background: var(--paper-edge); }
 .toggle-btn.active {
   background: var(--forest);
   border-color: var(--forest);
