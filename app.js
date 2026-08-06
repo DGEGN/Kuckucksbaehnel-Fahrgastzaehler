@@ -20,12 +20,13 @@ import {
 // Firestore-Sicherheitsregeln (siehe firestore.rules / README.md).
 // ---------------------------------------------------------
 const firebaseConfig = {
-  apiKey: "DEIN_API_KEY",
-  authDomain: "DEIN_PROJEKT.firebaseapp.com",
-  projectId: "DEIN_PROJEKT",
-  storageBucket: "DEIN_PROJEKT.appspot.com",
-  messagingSenderId: "DEINE_SENDER_ID",
-  appId: "DEINE_APP_ID"
+  apiKey: "AIzaSyCpfHTMh8zx2hmcxjF-ayIjW0lFtJcBtSM",
+  authDomain: "kuckuck-fahrkarten.firebaseapp.com",
+  databaseURL: "https://kuckuck-fahrkarten-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "kuckuck-fahrkarten",
+  storageBucket: "kuckuck-fahrkarten.firebasestorage.app",
+  messagingSenderId: "732559401683",
+  appId: "1:732559401683:web:dbfb8ef56c85c73de46a26"
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -88,10 +89,13 @@ function clamp0(n) { return Math.max(0, n || 0); }
 // z. B. "assets/wagen/mein-foto.jpg"). Reihenfolge = Anzeigereihenfolge.
 // ---------------------------------------------------------
 const WAGEN = [
-  { id: "wagen1", name: "Wagen 1", sitzplaetze: 24, bild: "assets/wagen/wagen1.svg" },
-  { id: "wagen2", name: "Wagen 2", sitzplaetze: 28, bild: "assets/wagen/wagen2.svg" },
-  { id: "wagen3", name: "Wagen 3", sitzplaetze: 32, bild: "assets/wagen/wagen3.svg" },
-  { id: "wagen4", name: "Aussichtswagen", sitzplaetze: 20, bild: "assets/wagen/wagen4.svg" }
+  { id: "wagen1", name: "Wagen 3", sitzplaetze: 44, bild: "assets/wagen/12240.jpg" },
+  { id: "wagen2", name: "Wagen 4", sitzplaetze: 72, bild: "assets/wagen/11150.jpg" },
+  { id: "wagen3", name: "Wagen 5", sitzplaetze: 72, bild: "assets/wagen/11082.jpg" },
+  { id: "wagen4", name: "Wagen 6", sitzplaetze: 70, bild: "assets/wagen/2455.jpg" },
+  { id: "wagen5", name: "Wagen 7", sitzplaetze: 88, bild: "assets/wagen/4918.jpg" },
+  { id: "wagen6", name: "Wagen 8", sitzplaetze: 53, bild: "assets/wagen/82813.jpg" },
+  { id: "wagen7", name: "Wagen 9", sitzplaetze: 56, bild: "assets/wagen/85034.jpg" }
 ];
 let selectedWagen = new Set();
 
