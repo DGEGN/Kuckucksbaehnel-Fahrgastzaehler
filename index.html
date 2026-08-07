@@ -12,11 +12,32 @@
 </head>
 <body>
 
-<!-- ===================== ANMELDEN / REGISTRIEREN ===================== -->
-<div id="auth" class="setup">
+<!-- ===================== ROLLENWAHL (Startseite) ===================== -->
+<div id="roleChoice" class="setup">
   <div class="setup-card">
     <img class="setup-logo" src="assets/logo.png" alt="Kuckucks-Bähnel Logo">
     <h1>Fahrgastzähler</h1>
+    <p class="setup-sub">Kuckucks-Bähnel</p>
+    <p class="field-hint role-choice-hint">Wie möchtest du die App nutzen?</p>
+
+    <button type="button" class="role-choice-btn" id="chooseBearbeiter">
+      <span class="role-choice-title">Bearbeiter</span>
+      <span class="role-choice-desc">Zählen, Wagen zuordnen, Fahrten anlegen. Anmeldung mit Museums-E-Mail nötig.</span>
+    </button>
+    <button type="button" class="role-choice-btn" id="chooseBetrachter">
+      <span class="role-choice-title">Betrachter 🔍</span>
+      <span class="role-choice-desc">Nur die Sitzplatzzahlen ansehen. Keine Anmeldung nötig.</span>
+    </button>
+
+    <p id="roleChoiceError" class="setup-error"></p>
+  </div>
+</div>
+
+<!-- ===================== ANMELDEN / REGISTRIEREN (nur Bearbeiter) ===================== -->
+<div id="auth" class="setup hidden">
+  <div class="setup-card">
+    <img class="setup-logo" src="assets/logo.png" alt="Kuckucks-Bähnel Logo">
+    <h1>Bearbeiter-Anmeldung</h1>
     <p class="setup-sub">Kuckucks-Bähnel</p>
 
     <div class="toggle-group" id="authModeGroup">
@@ -27,7 +48,7 @@
     <div id="loginForm" class="auth-form">
       <div class="field">
         <label for="loginEmail">E-Mail</label>
-        <input type="email" id="loginEmail" autocomplete="username" placeholder="name@beispiel.de">
+        <input type="email" id="loginEmail" autocomplete="username" placeholder="name@eisenbahnmuseum-neustadt.de">
       </div>
       <div class="field">
         <label for="loginPassword">Passwort</label>
@@ -40,7 +61,8 @@
     <div id="registerForm" class="auth-form hidden">
       <div class="field">
         <label for="registerEmail">E-Mail</label>
-        <input type="email" id="registerEmail" autocomplete="username" placeholder="name@beispiel.de">
+        <input type="email" id="registerEmail" autocomplete="username" placeholder="name@eisenbahnmuseum-neustadt.de">
+        <p class="field-hint">Registrierung ist nur mit einer @eisenbahnmuseum-neustadt.de-Adresse möglich.</p>
       </div>
       <div class="field">
         <label for="registerPassword">Passwort</label>
@@ -50,17 +72,10 @@
         <label for="registerPasswordRepeat">Passwort wiederholen</label>
         <input type="password" id="registerPasswordRepeat" autocomplete="new-password">
       </div>
-      <div class="field">
-        <label>Rolle</label>
-        <div class="toggle-group" id="registerRolleGroup">
-          <button type="button" class="toggle-btn" data-rolle="bearbeiter">Bearbeiter</button>
-          <button type="button" class="toggle-btn" data-rolle="betrachter">Betrachter 🔍</button>
-        </div>
-        <p class="field-hint">Bearbeiter zählt und bearbeitet, Betrachter sieht nur die Sitzplatzzahlen. Lässt sich später nicht mehr selbst ändern.</p>
-      </div>
       <button id="registerBtn" class="btn btn-brass btn-block">Konto erstellen</button>
     </div>
 
+    <button type="button" id="authBack" class="link-btn toggle-new-trip">‹ Zurück zur Rollenauswahl</button>
     <p id="authInfo" class="setup-info"></p>
     <p id="authError" class="setup-error"></p>
   </div>
@@ -73,10 +88,9 @@
     <h1>Fahrgastzähler</h1>
     <p class="setup-sub">Kuckucks-Bähnel</p>
 
-    <div class="field account-row">
+    <div class="field account-row hidden" id="accountRow">
       <div class="account-info">
         <span id="accountEmail" class="account-email">–</span>
-        <span id="accountRoleBadge" class="account-role-badge">Bearbeiter</span>
       </div>
       <button type="button" id="logoutBtn" class="link-btn">Abmelden</button>
     </div>
@@ -108,6 +122,7 @@
         <label>Standort</label>
         <div class="toggle-group" id="standortGroup">
           <button type="button" class="toggle-btn" data-standort="neustadt">Neustadt</button>
+          <button type="button" class="toggle-btn" data-standort="lambrecht">Lambrecht</button>
         </div>
       </div>
 
@@ -130,6 +145,7 @@
       <button id="startBtn" class="btn btn-brass btn-block">Fahrt anlegen und starten</button>
     </div>
 
+    <button type="button" id="setupBackToRole" class="link-btn toggle-new-trip">‹ Andere Rolle wählen</button>
     <p id="setupInfo" class="setup-info"></p>
     <p id="setupError" class="setup-error"></p>
   </div>
@@ -269,7 +285,6 @@
       <span class="brand-sub">Kuckucks-Bähnel · Betrachter 🔍</span>
     </div>
     <button id="viewerChangeSession" class="link-btn">Fahrt wechseln</button>
-    <button id="logoutBtnViewer" class="link-btn">Abmelden</button>
   </header>
 
   <div class="viewer-meta">

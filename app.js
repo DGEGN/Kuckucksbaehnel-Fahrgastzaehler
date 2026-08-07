@@ -10,7 +10,7 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getAuth, onAuthStateChanged, createUserWithEmailAndPassword,
-  signInWithEmailAndPassword, signOut, sendPasswordResetEmail
+  signInWithEmailAndPassword, signInAnonymously, signOut, sendPasswordResetEmail
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 
 // ---------------------------------------------------------
@@ -33,13 +33,20 @@ const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
 
-// currentUser wird von onAuthStateChanged gepflegt, siehe weiter unten
-// im Abschnitt "ANMELDUNG / REGISTRIERUNG".
+// currentUser wird beim Anmelden/Registrieren/Betrachter-Einstieg gesetzt,
+// siehe Abschnitt "ANMELDUNG / REGISTRIERUNG". firebaseUser hält lediglich
+// das zuletzt bekannte Firebase-Auth-Objekt nach, um beim Klick auf
+// "Bearbeiter" zu prüfen, ob schon eine echte Anmeldung besteht.
 let currentUser = null; // { uid, email, rolle }
-// Verhindert, dass der onAuthStateChanged-Listener während der Registrierung
-// (kurzes Zeitfenster zwischen Konto- und Profil-Erstellung) vorzeitig mit
-// einem noch fehlenden Profil weiterläuft.
-let authFlowInProgress = false;
+let firebaseUser = null;
+
+// Nur Konten mit dieser E-Mail-Domain dürfen sich als Bearbeiter registrieren.
+// Hinweis: Das ist zusätzlich in firestore.rules serverseitig abgesichert –
+// diese Prüfung hier ist nur für eine freundliche Fehlermeldung im Browser.
+const ALLOWED_EMAIL_DOMAIN = "eisenbahnmuseum-neustadt.de";
+function isAllowedEmailDomain(email) {
+  return email.toLowerCase().endsWith("@" + ALLOWED_EMAIL_DOMAIN);
+}
 
 // ---------------------------------------------------------
 // Konstanten & Hilfsfunktionen
@@ -104,8 +111,14 @@ let selectedWagen = new Set();
 // ---------------------------------------------------------
 const el = (id) => document.getElementById(id);
 
+const roleChoiceScreen = el("roleChoice");
+const chooseBearbeiterBtn = el("chooseBearbeiter");
+const chooseBetrachterBtn = el("chooseBetrachter");
+const roleChoiceError = el("roleChoiceError");
+
 const authScreen = el("auth");
 const authModeGroup = el("authModeGroup");
+const authBackBtn = el("authBack");
 const loginFormEl = el("loginForm");
 const registerFormEl = el("registerForm");
 const loginEmailInput = el("loginEmail");
@@ -115,7 +128,6 @@ const forgotPasswordBtn = el("forgotPasswordBtn");
 const registerEmailInput = el("registerEmail");
 const registerPasswordInput = el("registerPassword");
 const registerPasswordRepeatInput = el("registerPasswordRepeat");
-const registerRolleGroup = el("registerRolleGroup");
 const registerBtn = el("registerBtn");
 const authInfo = el("authInfo");
 const authError = el("authError");
@@ -123,11 +135,11 @@ const authError = el("authError");
 const setupScreen = el("setup");
 const appScreen = el("app");
 const viewerScreen = el("viewer");
+const accountRow = el("accountRow");
 const accountEmail = el("accountEmail");
-const accountRoleBadge = el("accountRoleBadge");
 const logoutBtn = el("logoutBtn");
 const logoutBtnApp = el("logoutBtnApp");
-const logoutBtnViewer = el("logoutBtnViewer");
+const setupBackToRoleBtn = el("setupBackToRole");
 const fahrtagInput = el("fahrtag");
 const standortGroup = el("standortGroup");
 const sitzplaetzeInput = el("sitzplaetze");
@@ -225,7 +237,6 @@ let unsubHistory = null;
 let unsubSetupList = null;
 let newTripVisible = false;
 let selectedStandort = null;
-let selectedRegisterRolle = null;
 let pendingGruppe = 1;
 let numpadValue = "";
 let numpadOnConfirm = null;
@@ -234,24 +245,58 @@ let currentTripData = null;   // letzter bekannter Snapshot-Inhalt der aktiven F
 let selectedWagenEdit = new Set();
 
 // ===========================================================
-// ANMELDUNG / REGISTRIERUNG
+// ROLLENWAHL / ANMELDUNG / REGISTRIERUNG
 // ===========================================================
 function initAuthScreen() {
+  chooseBearbeiterBtn.addEventListener("click", onChooseBearbeiter);
+  chooseBetrachterBtn.addEventListener("click", onChooseBetrachter);
+  authBackBtn.addEventListener("click", () => showOnly(roleChoiceScreen));
+  setupBackToRoleBtn.addEventListener("click", () => showOnly(roleChoiceScreen));
+
   authModeGroup.querySelectorAll(".toggle-btn").forEach((btn) => {
     btn.addEventListener("click", () => setAuthMode(btn.dataset.mode));
-  });
-  registerRolleGroup.querySelectorAll(".toggle-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      selectedRegisterRolle = btn.dataset.rolle;
-      registerRolleGroup.querySelectorAll(".toggle-btn").forEach((b) => b.classList.toggle("active", b === btn));
-    });
   });
   loginBtn.addEventListener("click", doLogin);
   registerBtn.addEventListener("click", doRegister);
   forgotPasswordBtn.addEventListener("click", doPasswordReset);
   logoutBtn.addEventListener("click", doLogout);
   logoutBtnApp.addEventListener("click", doLogout);
-  logoutBtnViewer.addEventListener("click", doLogout);
+
+  onAuthStateChanged(auth, (user) => { firebaseUser = user; });
+}
+
+// Zeigt genau einen der Hauptbildschirme, versteckt alle anderen.
+function showOnly(target) {
+  [roleChoiceScreen, authScreen, setupScreen, appScreen, viewerScreen].forEach((s) => {
+    s.classList.toggle("hidden", s !== target);
+  });
+  if (target === roleChoiceScreen) { roleChoiceError.textContent = ""; }
+}
+
+function onChooseBearbeiter() {
+  roleChoiceError.textContent = "";
+  if (firebaseUser && !firebaseUser.isAnonymous) {
+    currentUser = { uid: firebaseUser.uid, email: firebaseUser.email, rolle: "bearbeiter" };
+    enterSetupForRole("bearbeiter");
+  } else {
+    showAuthError(""); showAuthInfo("");
+    setAuthMode("login");
+    showOnly(authScreen);
+  }
+}
+
+async function onChooseBetrachter() {
+  roleChoiceError.textContent = "";
+  chooseBetrachterBtn.disabled = true;
+  try {
+    const user = auth.currentUser || (await signInAnonymously(auth)).user;
+    currentUser = { uid: user.uid, email: user.isAnonymous ? null : user.email, rolle: "betrachter" };
+    enterSetupForRole("betrachter");
+  } catch (err) {
+    roleChoiceError.textContent = "Verbindung fehlgeschlagen: " + err.message;
+  } finally {
+    chooseBetrachterBtn.disabled = false;
+  }
 }
 
 function setAuthMode(mode) {
@@ -287,8 +332,9 @@ async function doLogin() {
 
   loginBtn.disabled = true; loginBtn.textContent = "Anmelden…";
   try {
-    await signInWithEmailAndPassword(auth, email, password);
-    // onAuthStateChanged übernimmt das Laden des Profils und den Bildschirmwechsel
+    const cred = await signInWithEmailAndPassword(auth, email, password);
+    currentUser = { uid: cred.user.uid, email: cred.user.email, rolle: "bearbeiter" };
+    enterSetupForRole("bearbeiter");
   } catch (err) {
     showAuthError(authErrorMessage(err));
   } finally {
@@ -303,26 +349,22 @@ async function doRegister() {
   const passwordRepeat = registerPasswordRepeatInput.value;
 
   if (!email || !password) { showAuthError("Bitte E-Mail und Passwort eingeben."); return; }
+  if (!isAllowedEmailDomain(email)) {
+    showAuthError(`Registrierung ist nur mit einer @${ALLOWED_EMAIL_DOMAIN}-E-Mail-Adresse möglich.`);
+    return;
+  }
   if (password.length < 6) { showAuthError("Das Passwort muss mindestens 6 Zeichen lang sein."); return; }
   if (password !== passwordRepeat) { showAuthError("Die Passwörter stimmen nicht überein."); return; }
-  if (!selectedRegisterRolle) { showAuthError("Bitte eine Rolle auswählen."); return; }
 
   registerBtn.disabled = true; registerBtn.textContent = "Konto wird erstellt…";
-  authFlowInProgress = true;
   try {
     const cred = await createUserWithEmailAndPassword(auth, email, password);
-    await setDoc(doc(db, "benutzer", cred.user.uid), {
-      email, rolle: selectedRegisterRolle, erstellt: serverTimestamp()
-    });
-    // Nicht auf onAuthStateChanged warten (Race Condition: das Profil-Dokument
-    // könnte dort noch nicht sichtbar sein) – Profil direkt selbst setzen.
-    currentUser = { uid: cred.user.uid, email: cred.user.email, rolle: selectedRegisterRolle };
-    showSetupScreenLoggedIn();
+    currentUser = { uid: cred.user.uid, email: cred.user.email, rolle: "bearbeiter" };
+    enterSetupForRole("bearbeiter");
   } catch (err) {
     showAuthError(authErrorMessage(err));
   } finally {
     registerBtn.disabled = false; registerBtn.textContent = "Konto erstellen";
-    authFlowInProgress = false;
   }
 }
 
@@ -344,40 +386,29 @@ async function doLogout() {
     if (unsubActivity) { unsubActivity(); unsubActivity = null; }
     if (unsubHistory) { unsubHistory(); unsubHistory = null; }
     if (unsubSetupList) { unsubSetupList(); unsubSetupList = null; }
-    docRef = null; currentTripData = null; session = null;
+    docRef = null; currentTripData = null; session = null; currentUser = null;
     await signOut(auth);
+    showOnly(roleChoiceScreen);
   } catch (err) {
     showToast("Fehler beim Abmelden: " + err.message);
   }
 }
 
-async function loadUserProfile(user) {
-  try {
-    const ref = doc(db, "benutzer", user.uid);
-    const snap = await getDoc(ref);
-    const rolle = snap.exists() && snap.data().rolle === "bearbeiter" ? "bearbeiter" : "betrachter";
-    currentUser = { uid: user.uid, email: user.email, rolle };
-    showSetupScreenLoggedIn();
-  } catch (err) {
-    showAuthError("Profil konnte nicht geladen werden: " + err.message);
-    showAuthScreen();
-  }
-}
-
-function showAuthScreen() {
-  authScreen.classList.remove("hidden");
-  setupScreen.classList.add("hidden");
-  appScreen.classList.add("hidden");
-  viewerScreen.classList.add("hidden");
-}
-
-function showSetupScreenLoggedIn() {
-  authScreen.classList.add("hidden");
-  setupScreen.classList.remove("hidden");
+// Wechselt vom Anmelde- bzw. Rollenwahl-Bildschirm in die Fahrtenliste.
+function enterSetupForRole(rolle) {
+  showOnly(setupScreen);
   loginPasswordInput.value = "";
   registerPasswordInput.value = ""; registerPasswordRepeatInput.value = "";
   showAuthError(""); showAuthInfo("");
-  applyRolleUI();
+
+  const istBearbeiter = rolle === "bearbeiter";
+  accountRow.classList.toggle("hidden", !istBearbeiter);
+  if (istBearbeiter) accountEmail.textContent = currentUser?.email || "";
+
+  // Betrachter legen keine neuen Fahrten an, nur bestehende ansehen
+  newTripDivider.classList.toggle("hidden", !istBearbeiter);
+  toggleNewTripBtn.classList.toggle("hidden", !istBearbeiter);
+  if (!istBearbeiter) setNewTripVisible(false);
 
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(LS_KEY) || "null"); } catch (e) { /* ignore */ }
@@ -385,32 +416,6 @@ function showSetupScreenLoggedIn() {
 
   subscribeToExistingTrips();
 }
-
-function applyRolleUI() {
-  const istBetrachter = currentUser?.rolle === "betrachter";
-  accountEmail.textContent = currentUser?.email || "";
-  accountRoleBadge.textContent = istBetrachter ? "Betrachter 🔍" : "Bearbeiter";
-  accountRoleBadge.classList.toggle("betrachter", istBetrachter);
-  // Betrachter legen keine neuen Fahrten an, nur bestehende ansehen
-  newTripDivider.classList.toggle("hidden", istBetrachter);
-  toggleNewTripBtn.classList.toggle("hidden", istBetrachter);
-  if (istBetrachter) setNewTripVisible(false);
-}
-
-onAuthStateChanged(auth, (user) => {
-  if (authFlowInProgress) return; // doRegister behandelt den Profil-Aufbau selbst
-  if (user) {
-    loadUserProfile(user);
-  } else {
-    currentUser = null;
-    if (unsubDoc) { unsubDoc(); unsubDoc = null; }
-    if (unsubActivity) { unsubActivity(); unsubActivity = null; }
-    if (unsubHistory) { unsubHistory(); unsubHistory = null; }
-    if (unsubSetupList) { unsubSetupList(); unsubSetupList = null; }
-    docRef = null; currentTripData = null; session = null;
-    showAuthScreen();
-  }
-});
 
 // ===========================================================
 // SETUP SCREEN
@@ -755,14 +760,13 @@ function leaveApp() {
   fahrtagInput.value = session?.fahrtag || todayISO();
   if (session?.standort) selectStandort(session.standort);
   kasseInput.value = session?.kasse || "";
-  applyRolleUI();
   selectedWagen = new Set();
   seatOverrideField.classList.add("hidden");
   sitzplaetzeOverrideInput.value = "";
   toggleSeatOverrideBtn.textContent = "abweichende Gesamtzahl…";
   renderWagenGrid();
   setNewTripVisible(false);
-  subscribeToExistingTrips();
+  enterSetupForRole(currentUser?.rolle || "betrachter");
 }
 
 function warningLevelInfo(pct, free) {

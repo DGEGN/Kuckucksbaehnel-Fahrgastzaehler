@@ -207,11 +207,32 @@ input { font-family: var(--font-body); }
   background: var(--brass);
   color: #241b0c;
 }
-.account-role-badge.betrachter { background: var(--forest); color: #f3ecda; }
 
 .auth-form { margin-top: 22px; }
 .auth-form .field:last-of-type { margin-bottom: 14px; }
 #authModeGroup { margin-bottom: 4px; }
+
+/* ---------- Rollenwahl-Startseite ---------- */
+.role-choice-hint { text-align: center; margin: -4px 0 20px; }
+
+.role-choice-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  text-align: left;
+  background: #fff;
+  border: 2px solid var(--paper-dark);
+  border-radius: 10px;
+  padding: 16px 18px;
+  margin-bottom: 12px;
+  transition: border-color 0.1s ease, background 0.1s ease, transform 0.06s ease;
+}
+.role-choice-btn:hover { border-color: var(--brass); background: #fbf3e2; }
+.role-choice-btn:active { transform: scale(0.98); }
+.role-choice-title { font-family: var(--font-display); font-size: 1.1rem; color: var(--forest); }
+.role-choice-desc { font-size: 0.82rem; color: var(--ink-soft); line-height: 1.4; }
 #forgotPasswordBtn { margin-top: 10px; }
 .toggle-btn {
   flex: 1;

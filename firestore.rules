@@ -3,28 +3,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ---------------------------------------------------------
-    // Benutzerprofile: legt bei der Registrierung die Rolle fest
-    // (bearbeiter | betrachter). Jede/r kann nur das eigene Profil
-    // lesen und beim Erstellen selbst befüllen.
-    // ---------------------------------------------------------
-    match /benutzer/{userId} {
-      allow read: if request.auth != null && request.auth.uid == userId;
-
-      allow create: if request.auth != null
-        && request.auth.uid == userId
-        && request.resource.data.keys().hasAll(['email', 'rolle'])
-        && request.resource.data.rolle in ['bearbeiter', 'betrachter'];
-
-      // Profile werden nach dem Anlegen nicht mehr verändert oder gelöscht
-      allow update: if false;
-      allow delete: if false;
-    }
-
-    // Liest die Rolle des aktuell angemeldeten Kontos aus dessen Profil.
+    // Ein Konto zählt nur dann als "Bearbeiter", wenn es mit echter
+    // E-Mail/Passwort (nicht anonym) angemeldet ist UND die E-Mail auf die
+    // Museums-Domain endet. Betrachter sind i. d. R. anonym angemeldet
+    // (kein Konto nötig) und haben daher keine E-Mail im Auth-Token.
     function istBearbeiter() {
       return request.auth != null
-        && get(/databases/$(database)/documents/benutzer/$(request.auth.uid)).data.rolle == 'bearbeiter';
+        && request.auth.token.email != null
+        && request.auth.token.email.lower().matches('.*@eisenbahnmuseum-neustadt\\.de$');
     }
 
     // Eine Fahrt = ein Fahrtag an einem Standort (Dokument-ID: "YYYY-MM-DD_standort")
