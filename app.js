@@ -103,9 +103,9 @@ const WAGEN = [
   { id: "wagen5", name: "Wagen 5", sitzplaetze: 88, bild: "assets/wagen/4918.jpg" },
   { id: "wagen6", name: "Wagen 6", sitzplaetze: 53, bild: "assets/wagen/82813.jpg" },
   { id: "wagen7", name: "Wagen 7", sitzplaetze: 56, bild: "assets/wagen/85034.jpg" }, 
-  { id: "wagen8", name: "Wagen 8", sitzplaetze: 44, bild: "assets/wagen/85466.jpg" },
-  { id: "wagen9", name: "Wagen 9", sitzplaetze: 44, bild: "assets/wagen/84803.jpg" },
-  { id: "wagen10", name: "Wagen 10", sitzplaetze: 44, bild: "assets/wagen/301764.jpg" },
+  { id: "wagen8", name: "Wagen 8", sitzplaetze: 56, bild: "assets/wagen/85466.jpg" },
+  { id: "wagen9", name: "Wagen 9", sitzplaetze: 56, bild: "assets/wagen/84803.jpg" },
+  { id: "wagen10", name: "Wagen 10", sitzplaetze: 48, bild: "assets/wagen/301764.jpg" },
 ];
 let selectedWagen = new Set();
 
