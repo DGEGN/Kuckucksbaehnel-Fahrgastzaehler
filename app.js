@@ -28,7 +28,6 @@ const firebaseConfig = {
   messagingSenderId: "732559401683",
   appId: "1:732559401683:web:dbfb8ef56c85c73de46a26"
 };
-
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
@@ -106,7 +105,7 @@ const WAGEN = [
   { id: "wagen7", name: "Wagen 7", sitzplaetze: 56, bild: "assets/wagen/85034.jpg" }, 
   { id: "wagen8", name: "Wagen 8", sitzplaetze: 56, bild: "assets/wagen/85466.jpg" },
   { id: "wagen9", name: "Wagen 9", sitzplaetze: 56, bild: "assets/wagen/84803.jpg" },
-  { id: "wagen10", name: "Wagen 10", sitzplaetze: 48, bild: "assets/wagen/301764.jpg" },
+  { id: "wagen10", name: "Wagen 10", sitzplaetze: 48, bild: "assets/wagen/301764.jpg" }
 ];
 let selectedWagen = new Set();
 
@@ -150,6 +149,8 @@ const openAdminBtn = el("openAdmin");
 
 const impressumOverlay = el("impressumOverlay");
 const impressumCloseBtn = el("impressumClose");
+const fullOverlay = el("fullOverlay");
+const fullOverlayCloseBtn = el("fullOverlayClose");
 const openImpressumBtns = document.querySelectorAll(".open-impressum-link");
 
 const setupScreen = el("setup");
@@ -268,6 +269,7 @@ let latestHistoryRows = [];
 let currentTripData = null;   // letzter bekannter Snapshot-Inhalt der aktiven Fahrt
 let selectedWagenEdit = new Set();
 let unsubAdminList = null;
+let lastWarnLevel = null; // verfolgt die zuletzt gesehene Belegungsstufe dieser Fahrt
 
 // ===========================================================
 // ROLLENWAHL / ANMELDUNG / REGISTRIERUNG
@@ -298,6 +300,7 @@ function initAuthScreen() {
 
   openImpressumBtns.forEach((btn) => btn.addEventListener("click", () => impressumOverlay.classList.remove("hidden")));
   impressumCloseBtn.addEventListener("click", () => impressumOverlay.classList.add("hidden"));
+  fullOverlayCloseBtn.addEventListener("click", () => fullOverlay.classList.add("hidden"));
 
   onAuthStateChanged(auth, (user) => { firebaseUser = user; });
 }
@@ -463,6 +466,7 @@ async function doLogout() {
     if (unsubSetupList) { unsubSetupList(); unsubSetupList = null; }
     if (unsubAdminList) { unsubAdminList(); unsubAdminList = null; }
     docRef = null; currentTripData = null; session = null; currentUser = null;
+    fullOverlay.classList.add("hidden");
     await signOut(auth);
     showOnly(roleChoiceScreen);
   } catch (err) {
@@ -901,6 +905,8 @@ async function startSession() {
 // ===========================================================
 function enterApp() {
   setupScreen.classList.add("hidden");
+  resetFullAlertTracking();
+  fullOverlay.classList.add("hidden");
 
   if (session.rolle === "betrachter") {
     appScreen.classList.add("hidden");
@@ -928,6 +934,7 @@ function leaveApp() {
   if (unsubHistory) unsubHistory();
   docRef = null;
   currentTripData = null;
+  fullOverlay.classList.add("hidden");
   showSetupError(""); showSetupInfo("");
   fahrtagInput.value = session?.fahrtag || todayISO();
   if (session?.standort) selectStandort(session.standort);
@@ -955,6 +962,37 @@ function applyWarningClasses(el, level) {
   if (level !== "0") el.classList.add("level-" + level);
 }
 
+// ---------------------------------------------------------
+// Vollbesetzt-Warnung (Popup + Ton bei 100 % Belegung)
+// ---------------------------------------------------------
+function playAlertSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const now = ctx.currentTime;
+    [0, 0.22].forEach((offset, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = "sine";
+      osc.frequency.value = i === 0 ? 880 : 660;
+      gain.gain.setValueAtTime(0.0001, now + offset);
+      gain.gain.exponentialRampToValueAtTime(0.35, now + offset + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + offset + 0.22);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now + offset);
+      osc.stop(now + offset + 0.26);
+    });
+  } catch (e) { /* Ton ist optional (z. B. Autoplay-Einschränkungen) – Fehler ignorieren */ }
+}
+
+function triggerFullAlert() {
+  playAlertSound();
+  fullOverlay.classList.remove("hidden");
+}
+
+// Wird beim Beitreten/Anlegen einer Fahrt zurückgesetzt, damit die Warnung
+// pro Fahrt genau einmal beim Erreichen von 100 % auslöst.
+function resetFullAlertTracking() { lastWarnLevel = null; }
+
 function subscribeToTrip() {
   const setStatus = session.rolle === "betrachter"
     ? (state) => applyConnStatus(viewerConnStatus, state)
@@ -975,6 +1013,11 @@ function subscribeToTrip() {
     const free = seats - total;
     const pct = seats > 0 ? total / seats : 0;
     const info = warningLevelInfo(pct, free);
+
+    if (info.level === "100" && lastWarnLevel !== "100") {
+      triggerFullAlert();
+    }
+    lastWarnLevel = info.level;
 
     if (session.rolle === "betrachter") {
       viewerOccupiedEl.textContent = total;

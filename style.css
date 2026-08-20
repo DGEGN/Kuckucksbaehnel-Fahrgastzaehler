@@ -285,6 +285,19 @@ input { font-family: var(--font-body); }
 .impressum-body strong { color: var(--ink); }
 .impressum-hint { font-style: italic; font-size: 0.78rem; }
 
+/* ---------- Vollbesetzt-Warnung ---------- */
+.full-alert-card { max-width: 340px; text-align: center; }
+.full-alert-icon { font-size: 2.6rem; margin-bottom: 6px; animation: full-alert-pulse 1s ease-in-out infinite; }
+.full-alert-title { color: var(--alert); margin: 0 0 10px; font-family: var(--font-display); }
+.full-alert-text { color: var(--ink-soft); margin: 0 0 20px; font-size: 0.92rem; line-height: 1.4; }
+@keyframes full-alert-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .full-alert-icon { animation: none; }
+}
+
 .toggle-btn {
   flex: 1;
   padding: 12px;
