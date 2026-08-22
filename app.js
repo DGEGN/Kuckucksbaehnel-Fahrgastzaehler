@@ -28,6 +28,7 @@ const firebaseConfig = {
   messagingSenderId: "732559401683",
   appId: "1:732559401683:web:dbfb8ef56c85c73de46a26"
 };
+
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
@@ -1300,7 +1301,32 @@ window.addEventListener("offline", () => {
 });
 
 // ---------------------------------------------------------
+// Design-Umschalter (klassisch / modern)
+// ---------------------------------------------------------
+const THEME_KEY = "kb_theme";
+const themeToggleBtn = document.getElementById("themeToggleBtn");
+const themeToggleLabel = document.getElementById("themeToggleLabel");
+
+function applyThemeToggleLabel() {
+  const current = document.documentElement.getAttribute("data-theme") || "classic";
+  themeToggleLabel.textContent = current === "classic" ? "Modernes Design" : "Klassisches Design";
+  themeToggleBtn.querySelector(".theme-toggle-icon").textContent = current === "classic" ? "🚉" : "🎫";
+}
+
+function initThemeToggle() {
+  applyThemeToggleLabel();
+  themeToggleBtn.addEventListener("click", () => {
+    const current = document.documentElement.getAttribute("data-theme") || "classic";
+    const next = current === "classic" ? "modern" : "classic";
+    document.documentElement.setAttribute("data-theme", next);
+    try { localStorage.setItem(THEME_KEY, next); } catch (e) { /* ignore */ }
+    applyThemeToggleLabel();
+  });
+}
+
+// ---------------------------------------------------------
 // Start
 // ---------------------------------------------------------
+initThemeToggle();
 initAuthScreen();
 initSetupScreen();
