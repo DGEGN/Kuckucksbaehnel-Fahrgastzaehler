@@ -65,7 +65,7 @@ const KATEGORIE_LABEL = {
 function computeTotal(d) {
   return clamp0(d.einzelperson) + clamp0(d.erwachsene) + clamp0(d.kinder) + clamp0(d.familien) + clamp0(d.gruppen);
 }
-const STANDORT_LABEL = { neustadt: "Neustadt", lambrecht: "Lambrecht" };
+const STANDORT_LABEL = { neustadt: "Neustadt", lambrecht: "Lambrecht", elmstein: "Elmstein" };
 const ZUG_LABEL = { d3: "D3", d4: "D4", d5: "D5", d6: "D6", sonderzug: "Sonderzug" };
 const LS_KEY = "kb_session_v1";
 
@@ -185,6 +185,7 @@ const zugLabel = el("zugLabel");
 const standortLabel = el("standortLabel");
 const kasseLabel = el("kasseLabel");
 const changeSessionBtn = el("changeSession");
+const previewViewerBtn = el("previewViewerBtn");
 const connStatus = el("connStatus");
 
 const seatsBanner = el("seatsBanner");
@@ -231,6 +232,7 @@ const numpadCancel = el("numpadCancel");
 
 // Viewer-Screen (Betrachter)
 const viewerChangeSessionBtn = el("viewerChangeSession");
+const backToEditorBtn = el("backToEditorBtn");
 const viewerFahrtagLabel = el("viewerFahrtagLabel");
 const viewerZugLabel = el("viewerZugLabel");
 const viewerStandortLabel = el("viewerStandortLabel");
@@ -271,6 +273,10 @@ let currentTripData = null;   // letzter bekannter Snapshot-Inhalt der aktiven F
 let selectedWagenEdit = new Set();
 let unsubAdminList = null;
 let lastWarnLevel = null; // verfolgt die zuletzt gesehene Belegungsstufe dieser Fahrt
+// Welcher Bildschirm gerade angezeigt wird ("bearbeiter" | "betrachter").
+// Kann während einer aktiven Sitzung vom eigentlichen session.rolle abweichen,
+// wenn ein Bearbeiter kurz in die Betrachter-Vorschau wechselt.
+let displayMode = null;
 
 // ===========================================================
 // ROLLENWAHL / ANMELDUNG / REGISTRIERUNG
@@ -908,13 +914,15 @@ function enterApp() {
   setupScreen.classList.add("hidden");
   resetFullAlertTracking();
   fullOverlay.classList.add("hidden");
+  displayMode = session.rolle === "betrachter" ? "betrachter" : "bearbeiter";
 
-  if (session.rolle === "betrachter") {
+  if (displayMode === "betrachter") {
     appScreen.classList.add("hidden");
     viewerScreen.classList.remove("hidden");
     viewerFahrtagLabel.textContent = formatDateDE(session.fahrtag);
     viewerZugLabel.textContent = ZUG_LABEL[session.zug] || session.zug;
     viewerStandortLabel.textContent = STANDORT_LABEL[session.standort] || session.standort;
+    backToEditorBtn.classList.add("hidden");
   } else {
     viewerScreen.classList.add("hidden");
     appScreen.classList.remove("hidden");
@@ -929,12 +937,35 @@ function enterApp() {
   subscribeToTrip();
 }
 
+// Wechselt innerhalb derselben Fahrt kurz in die große Betrachter-Anzeige,
+// ohne die Bearbeiter-Sitzung zu verlassen (z. B. um die Auslastung von
+// weitem zu prüfen). Über "Zur Zählansicht" geht es zurück.
+function showViewerPreview() {
+  if (!docRef || !session) return;
+  displayMode = "betrachter";
+  appScreen.classList.add("hidden");
+  viewerScreen.classList.remove("hidden");
+  viewerFahrtagLabel.textContent = formatDateDE(session.fahrtag);
+  viewerZugLabel.textContent = ZUG_LABEL[session.zug] || session.zug;
+  viewerStandortLabel.textContent = STANDORT_LABEL[session.standort] || session.standort;
+  backToEditorBtn.classList.remove("hidden");
+}
+
+function backToEditorView() {
+  if (session?.rolle !== "bearbeiter") return;
+  displayMode = "bearbeiter";
+  viewerScreen.classList.add("hidden");
+  appScreen.classList.remove("hidden");
+}
+
 function leaveApp() {
   if (unsubDoc) unsubDoc();
   if (unsubActivity) unsubActivity();
   if (unsubHistory) unsubHistory();
   docRef = null;
   currentTripData = null;
+  displayMode = null;
+  backToEditorBtn.classList.add("hidden");
   fullOverlay.classList.add("hidden");
   showSetupError(""); showSetupInfo("");
   fahrtagInput.value = session?.fahrtag || todayISO();
@@ -995,9 +1026,9 @@ function triggerFullAlert() {
 function resetFullAlertTracking() { lastWarnLevel = null; }
 
 function subscribeToTrip() {
-  const setStatus = session.rolle === "betrachter"
-    ? (state) => applyConnStatus(viewerConnStatus, state)
-    : (state) => applyConnStatus(connStatus, state);
+  const setStatus = (state) => {
+    applyConnStatus(displayMode === "betrachter" ? viewerConnStatus : connStatus, state);
+  };
 
   setStatus("connecting");
   unsubDoc = onSnapshot(docRef, (snap) => {
@@ -1020,7 +1051,7 @@ function subscribeToTrip() {
     }
     lastWarnLevel = info.level;
 
-    if (session.rolle === "betrachter") {
+    if (displayMode === "betrachter") {
       viewerOccupiedEl.textContent = total;
       viewerTotalSeatsEl.textContent = seats;
       viewerFreeEl.textContent = free;
@@ -1282,6 +1313,8 @@ resetDayBtn.addEventListener("click", () => {
 exportCsvBtn.addEventListener("click", exportCsv);
 changeSessionBtn.addEventListener("click", leaveApp);
 viewerChangeSessionBtn.addEventListener("click", leaveApp);
+previewViewerBtn.addEventListener("click", showViewerPreview);
+backToEditorBtn.addEventListener("click", backToEditorView);
 
 editSeatsBtn.addEventListener("click", openWagenEdit);
 wagenEditCancel.addEventListener("click", closeWagenEdit);
