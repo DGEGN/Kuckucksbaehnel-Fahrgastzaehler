@@ -89,6 +89,23 @@ service cloud.firestore {
         allow delete: if istBearbeiter();
         allow update: if false;
       }
+
+      // Vorreservierte Gruppen (Name + Personenzahl). Werden beim Bestätigen
+      // gelöscht und gleichzeitig als normale Gruppen-Zählung verbucht.
+      match /reservierungen/{resId} {
+        allow read: if request.auth != null;
+
+        allow create: if istBearbeiter()
+          && request.resource.data.keys().hasAll(['name', 'anzahl'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.anzahl is int
+          && request.resource.data.anzahl > 0;
+
+        // Bestätigen/Entfernen läuft über Löschen (+ ggf. separate Zählung)
+        allow delete: if istBearbeiter();
+        allow update: if false;
+      }
     }
   }
 }

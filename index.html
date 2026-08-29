@@ -195,6 +195,19 @@
         </div>
       </div>
 
+      <div class="field">
+        <label>Vorreservierte Gruppen <span class="opt">(optional)</span></label>
+        <p class="field-hint">Gruppen, die für diesen Zug schon angemeldet sind. Lassen sich auch später noch ergänzen.</p>
+        <ul id="newTripReservationsList" class="reservations-list">
+          <li class="activity-empty">Noch keine Reservierung hinzugefügt.</li>
+        </ul>
+        <div class="reservation-add-row">
+          <input type="text" id="newTripResName" placeholder="Gruppenname" maxlength="40">
+          <input type="number" id="newTripResAnzahl" placeholder="Anzahl" min="1" step="1" inputmode="numeric">
+          <button type="button" id="newTripResAdd" class="btn btn-ghost btn-small">+ Hinzufügen</button>
+        </div>
+      </div>
+
       <button id="startBtn" class="btn btn-brass btn-block">Fahrt anlegen und starten</button>
     </div>
 
@@ -267,6 +280,11 @@
       <span id="totalToday" class="seats-value seats-value-mono">0</span>
     </div>
     <div class="seats-divider">/</div>
+    <div class="seats-item seats-reserved">
+      <span class="seats-label">Reserviert</span>
+      <span id="seatsReserved" class="seats-value seats-value-mono">0</span>
+    </div>
+    <div class="seats-divider">/</div>
     <div class="seats-item">
       <span class="seats-label">Sitzplätze</span>
       <span id="seatsTotal" class="seats-value seats-value-mono">0</span>
@@ -281,6 +299,21 @@
   <div class="seats-edit-row">
     <button type="button" id="editSeatsBtn" class="link-btn">Sitzplätze / Wagen nachträglich bearbeiten</button>
   </div>
+
+  <section class="panel reservations-panel" id="reservationsPanel">
+    <div class="panel-head">
+      <h2>Reservierte Gruppen</h2>
+      <span class="panel-sub">bei Ankunft bestätigen</span>
+    </div>
+    <ul id="reservationsList" class="reservations-list">
+      <li class="activity-empty">Keine Reservierungen für diese Fahrt.</li>
+    </ul>
+    <div class="reservation-add-row">
+      <input type="text" id="reservationName" placeholder="Gruppenname" maxlength="40">
+      <input type="number" id="reservationAnzahl" placeholder="Anzahl" min="1" step="1" inputmode="numeric">
+      <button type="button" id="reservationAdd" class="btn btn-brass btn-small">+ Hinzufügen</button>
+    </div>
+  </section>
 
   <main class="main">
 
@@ -376,6 +409,10 @@
       <div class="viewer-seat-block">
         <span class="viewer-seat-label">Besetzt</span>
         <span id="viewerOccupied" class="viewer-seat-value">0</span>
+      </div>
+      <div class="viewer-seat-block viewer-seat-reserved">
+        <span class="viewer-seat-label">Reserviert</span>
+        <span id="viewerReserved" class="viewer-seat-value">0</span>
       </div>
       <div class="viewer-seat-block">
         <span class="viewer-seat-label">Gesamt</span>

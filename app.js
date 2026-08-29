@@ -193,8 +193,18 @@ const totalTodayEl = el("totalToday");
 const seatsTotalEl = el("seatsTotal");
 const seatsFreeEl = el("seatsFree");
 const seatsFreeLabel = el("seatsFreeLabel");
+const seatsReservedEl = el("seatsReserved");
 const seatsWarningBadge = el("seatsWarningBadge");
 const editSeatsBtn = el("editSeatsBtn");
+const reservationsList = el("reservationsList");
+const reservationNameInput = el("reservationName");
+const reservationAnzahlInput = el("reservationAnzahl");
+const reservationAddBtn = el("reservationAdd");
+const newTripReservationsList = el("newTripReservationsList");
+const newTripResNameInput = el("newTripResName");
+const newTripResAnzahlInput = el("newTripResAnzahl");
+const newTripResAddBtn = el("newTripResAdd");
+const viewerReservedEl = el("viewerReserved");
 
 const countEinzelperson = el("countEinzelperson");
 const countFamilien = el("countFamilien");
@@ -270,6 +280,10 @@ let numpadValue = "";
 let numpadOnConfirm = null;
 let latestHistoryRows = [];
 let currentTripData = null;   // letzter bekannter Snapshot-Inhalt der aktiven Fahrt
+let unsubReservierungen = null;
+let currentReservations = [];   // vorreservierte Gruppen der aktiven Fahrt
+let reservedSum = 0;            // Summe der noch nicht bestätigten Reservierungen
+let pendingNewTripReservations = []; // Reservierungen, die beim Anlegen einer neuen Fahrt gesammelt werden
 let selectedWagenEdit = new Set();
 let unsubAdminList = null;
 let lastWarnLevel = null; // verfolgt die zuletzt gesehene Belegungsstufe dieser Fahrt
@@ -472,7 +486,9 @@ async function doLogout() {
     if (unsubHistory) { unsubHistory(); unsubHistory = null; }
     if (unsubSetupList) { unsubSetupList(); unsubSetupList = null; }
     if (unsubAdminList) { unsubAdminList(); unsubAdminList = null; }
+    if (unsubReservierungen) { unsubReservierungen(); unsubReservierungen = null; }
     docRef = null; currentTripData = null; session = null; currentUser = null;
+    currentReservations = []; reservedSum = 0;
     fullOverlay.classList.add("hidden");
     await signOut(auth);
     showOnly(roleChoiceScreen);
@@ -614,6 +630,10 @@ function initSetupScreen() {
     if (!visible) { sitzplaetzeOverrideInput.value = ""; updateWagenTotal(); }
   });
   sitzplaetzeOverrideInput.addEventListener("input", updateWagenTotal);
+
+  renderNewTripReservations();
+  newTripResAddBtn.addEventListener("click", addNewTripReservation);
+  reservationAddBtn.addEventListener("click", addReservation);
 
   startBtn.addEventListener("click", startSession);
   toggleNewTripBtn.addEventListener("click", () => setNewTripVisible(!newTripVisible));
@@ -894,6 +914,14 @@ async function startSession() {
       });
     }
 
+    if (pendingNewTripReservations.length) {
+      await Promise.all(pendingNewTripReservations.map((r) =>
+        addDoc(collection(ref, "reservierungen"), { name: r.name, anzahl: r.anzahl, erstellt: serverTimestamp() })
+      ));
+      pendingNewTripReservations = [];
+      renderNewTripReservations();
+    }
+
     session = { fahrtag, zug: selectedZug, standort: selectedStandort, kasse, sitzplaetze, rolle: currentUser.rolle };
     docRef = ref;
     localStorage.setItem(LS_KEY, JSON.stringify({ kasse, standort: selectedStandort }));
@@ -935,6 +963,7 @@ function enterApp() {
   }
 
   subscribeToTrip();
+  subscribeToReservierungen();
 }
 
 // Wechselt innerhalb derselben Fahrt kurz in die große Betrachter-Anzeige,
@@ -962,8 +991,12 @@ function leaveApp() {
   if (unsubDoc) unsubDoc();
   if (unsubActivity) unsubActivity();
   if (unsubHistory) unsubHistory();
+  if (unsubReservierungen) { unsubReservierungen(); unsubReservierungen = null; }
   docRef = null;
   currentTripData = null;
+  currentReservations = [];
+  reservedSum = 0;
+  pendingNewTripReservations = [];
   displayMode = null;
   backToEditorBtn.classList.add("hidden");
   fullOverlay.classList.add("hidden");
@@ -978,6 +1011,7 @@ function leaveApp() {
   sitzplaetzeOverrideInput.value = "";
   toggleSeatOverrideBtn.textContent = "abweichende Gesamtzahl…";
   renderWagenGrid();
+  renderNewTripReservations();
   setNewTripVisible(false);
   enterSetupForRole(currentUser?.rolle || "betrachter");
 }
@@ -1034,52 +1068,177 @@ function subscribeToTrip() {
   unsubDoc = onSnapshot(docRef, (snap) => {
     setStatus(snap.metadata.fromCache ? "offline" : "online");
     if (!snap.exists()) return;
-    const d = snap.data();
-    currentTripData = d;
-    // "einzel" fasst die neue Einzelperson-Kategorie plus alte erwachsene/kinder
-    // (falls diese Fahrt noch mit der Vorgängerversion gezählt wurde) zusammen.
-    const einzel = clamp0(d.einzelperson) + clamp0(d.erwachsene) + clamp0(d.kinder);
-    const fam = clamp0(d.familien), grp = clamp0(d.gruppen);
-    const total = computeTotal(d);
-    const seats = clamp0(d.sitzplaetze);
-    const free = seats - total;
-    const pct = seats > 0 ? total / seats : 0;
-    const info = warningLevelInfo(pct, free);
-
-    if (info.level === "100" && lastWarnLevel !== "100") {
-      triggerFullAlert();
-    }
-    lastWarnLevel = info.level;
-
-    if (displayMode === "betrachter") {
-      viewerOccupiedEl.textContent = total;
-      viewerTotalSeatsEl.textContent = seats;
-      viewerFreeEl.textContent = free;
-      viewerFreeLabel.textContent = free < 0 ? "Überbucht" : "Frei";
-      applyWarningClasses(viewerScreen, info.level);
-      if (info.text) { viewerWarning.textContent = info.text; viewerWarning.classList.remove("hidden"); }
-      else viewerWarning.classList.add("hidden");
-    } else {
-      countEinzelperson.textContent = einzel;
-      countFamilien.textContent = fam;
-      countGruppen.textContent = grp;
-      totalTodayEl.textContent = total;
-      seatsTotalEl.textContent = seats;
-      seatsFreeEl.textContent = free;
-      seatsFreeLabel.textContent = free < 0 ? "überbucht" : "frei";
-      applyWarningClasses(seatsBanner, info.level);
-      if (info.text) { seatsWarningBadge.textContent = info.text; seatsWarningBadge.classList.remove("hidden"); }
-      else seatsWarningBadge.classList.add("hidden");
-    }
+    currentTripData = snap.data();
+    renderCounts();
   }, (err) => {
     setStatus("offline");
     showToast("Verbindungsfehler: " + err.message);
   });
 }
 
+// Rendert Zähl-, Sitzplatz- und Warnanzeige aus currentTripData + reservedSum.
+// Wird sowohl vom Fahrt-Listener als auch vom Reservierungs-Listener aufgerufen,
+// damit beide Datenquellen konsistent zusammen berücksichtigt werden.
+function renderCounts() {
+  if (!currentTripData) return;
+  const d = currentTripData;
+  // "einzel" fasst die neue Einzelperson-Kategorie plus alte erwachsene/kinder
+  // (falls diese Fahrt noch mit der Vorgängerversion gezählt wurde) zusammen.
+  const einzel = clamp0(d.einzelperson) + clamp0(d.erwachsene) + clamp0(d.kinder);
+  const fam = clamp0(d.familien), grp = clamp0(d.gruppen);
+  const total = computeTotal(d);
+  const seats = clamp0(d.sitzplaetze);
+  const reserviert = reservedSum;
+  // Reservierte Plätze gelten als "schon vergeben", auch bevor die Gruppe da ist.
+  const free = seats - total - reserviert;
+  const pct = seats > 0 ? (total + reserviert) / seats : 0;
+  const info = warningLevelInfo(pct, free);
+
+  if (info.level === "100" && lastWarnLevel !== "100") {
+    triggerFullAlert();
+  }
+  lastWarnLevel = info.level;
+
+  if (displayMode === "betrachter") {
+    viewerOccupiedEl.textContent = total;
+    viewerReservedEl.textContent = reserviert;
+    viewerTotalSeatsEl.textContent = seats;
+    viewerFreeEl.textContent = free;
+    viewerFreeLabel.textContent = free < 0 ? "Überbucht" : "Frei";
+    applyWarningClasses(viewerScreen, info.level);
+    if (info.text) { viewerWarning.textContent = info.text; viewerWarning.classList.remove("hidden"); }
+    else viewerWarning.classList.add("hidden");
+  } else {
+    countEinzelperson.textContent = einzel;
+    countFamilien.textContent = fam;
+    countGruppen.textContent = grp;
+    totalTodayEl.textContent = total;
+    seatsReservedEl.textContent = reserviert;
+    seatsTotalEl.textContent = seats;
+    seatsFreeEl.textContent = free;
+    seatsFreeLabel.textContent = free < 0 ? "überbucht" : "frei";
+    applyWarningClasses(seatsBanner, info.level);
+    if (info.text) { seatsWarningBadge.textContent = info.text; seatsWarningBadge.classList.remove("hidden"); }
+    else seatsWarningBadge.classList.add("hidden");
+  }
+}
+
 function applyConnStatus(el, state) {
   el.className = "conn-status conn-" + state;
   el.textContent = state === "online" ? "live verbunden" : state === "offline" ? "keine Verbindung" : "verbinde…";
+}
+
+// ---------------------------------------------------------
+// Vorreservierte Gruppen
+// ---------------------------------------------------------
+function subscribeToReservierungen() {
+  const q = query(collection(docRef, "reservierungen"), orderBy("erstellt", "asc"));
+  unsubReservierungen = onSnapshot(q, (snap) => {
+    currentReservations = [];
+    snap.forEach((docSnap) => currentReservations.push({ id: docSnap.id, ...docSnap.data() }));
+    reservedSum = currentReservations.reduce((sum, r) => sum + clamp0(r.anzahl), 0);
+    renderReservationsList();
+    renderCounts();
+  }, () => {
+    reservationsList.innerHTML = '<li class="activity-empty">Reservierungen konnten nicht geladen werden.</li>';
+  });
+}
+
+function renderReservationsList() {
+  if (!currentReservations.length) {
+    reservationsList.innerHTML = '<li class="activity-empty">Keine Reservierungen für diese Fahrt.</li>';
+    return;
+  }
+  reservationsList.innerHTML = "";
+  currentReservations.forEach((r) => {
+    const li = document.createElement("li");
+    li.className = "reservation-item";
+    li.innerHTML = `
+      <span class="reservation-name">${escapeHtml(r.name)}</span>
+      <span class="reservation-anzahl">${clamp0(r.anzahl)} Pers.</span>
+      <button type="button" class="btn btn-brass btn-small" data-confirm="${r.id}">✓ Angekommen</button>
+      <button type="button" class="reservation-remove" data-remove="${r.id}" aria-label="Reservierung entfernen">✕</button>
+    `;
+    reservationsList.appendChild(li);
+  });
+  reservationsList.querySelectorAll("[data-confirm]").forEach((btn) => {
+    btn.addEventListener("click", () => confirmReservation(btn.dataset.confirm));
+  });
+  reservationsList.querySelectorAll("[data-remove]").forEach((btn) => {
+    btn.addEventListener("click", () => removeReservation(btn.dataset.remove));
+  });
+}
+
+async function confirmReservation(resId) {
+  const res = currentReservations.find((r) => r.id === resId);
+  if (!res || !docRef) return;
+  try {
+    await deleteDoc(doc(collection(docRef, "reservierungen"), resId));
+    await addFahrgaeste("gruppen", clamp0(res.anzahl));
+    showToast(`„${res.name}" bestätigt (+${res.anzahl} zur Gruppe).`);
+  } catch (err) {
+    showToast("Fehler: " + err.message);
+  }
+}
+
+async function removeReservation(resId) {
+  if (!docRef) return;
+  try {
+    await deleteDoc(doc(collection(docRef, "reservierungen"), resId));
+  } catch (err) {
+    showToast("Fehler: " + err.message);
+  }
+}
+
+async function addReservation() {
+  if (!docRef) return;
+  const name = reservationNameInput.value.trim();
+  const anzahl = parseInt(reservationAnzahlInput.value, 10);
+  if (!name) { showToast("Bitte einen Gruppennamen eingeben."); return; }
+  if (!anzahl || anzahl < 1) { showToast("Bitte eine gültige Personenzahl eingeben."); return; }
+  try {
+    await addDoc(collection(docRef, "reservierungen"), { name, anzahl, erstellt: serverTimestamp() });
+    reservationNameInput.value = "";
+    reservationAnzahlInput.value = "";
+  } catch (err) {
+    showToast("Fehler: " + err.message);
+  }
+}
+
+// --- Vorreservierte Gruppen beim Anlegen einer NEUEN Fahrt (noch ohne docRef) ---
+function renderNewTripReservations() {
+  if (!pendingNewTripReservations.length) {
+    newTripReservationsList.innerHTML = '<li class="activity-empty">Noch keine Reservierung hinzugefügt.</li>';
+    return;
+  }
+  newTripReservationsList.innerHTML = "";
+  pendingNewTripReservations.forEach((r, i) => {
+    const li = document.createElement("li");
+    li.className = "reservation-item";
+    li.innerHTML = `
+      <span class="reservation-name">${escapeHtml(r.name)}</span>
+      <span class="reservation-anzahl">${clamp0(r.anzahl)} Pers.</span>
+      <button type="button" class="reservation-remove" data-remove-index="${i}" aria-label="Reservierung entfernen">✕</button>
+    `;
+    newTripReservationsList.appendChild(li);
+  });
+  newTripReservationsList.querySelectorAll("[data-remove-index]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      pendingNewTripReservations.splice(parseInt(btn.dataset.removeIndex, 10), 1);
+      renderNewTripReservations();
+    });
+  });
+}
+
+function addNewTripReservation() {
+  const name = newTripResNameInput.value.trim();
+  const anzahl = parseInt(newTripResAnzahlInput.value, 10);
+  if (!name) { showToast("Bitte einen Gruppennamen eingeben."); return; }
+  if (!anzahl || anzahl < 1) { showToast("Bitte eine gültige Personenzahl eingeben."); return; }
+  pendingNewTripReservations.push({ name, anzahl });
+  newTripResNameInput.value = "";
+  newTripResAnzahlInput.value = "";
+  renderNewTripReservations();
 }
 function setConnStatus(state) { applyConnStatus(connStatus, state); }
 

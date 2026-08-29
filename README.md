@@ -12,6 +12,13 @@ direkt im Browser (HTML/CSS/JS), Daten liegen in Firebase Firestore und werden
 
 ## Funktionsweise
 
+- **Design umschalten**: Unten rechts sitzt ein kleiner Button ("🚉 Modernes
+  Design" / "🎫 Klassisches Design"), der jederzeit zwischen zwei kompletten
+  Optiken wechselt: dem klassischen Fahrkarten-Design und einem modernen
+  "Bahnhofstafel"-Design (dunkle Zahlen-Anzeigen im Fallblatt-Look). Die Wahl
+  wird im Browser gespeichert (`localStorage`) und bleibt bei der nächsten
+  Nutzung erhalten. Beide Designs sind rein optisch – Funktionen, Daten und
+  Berechtigungen sind in beiden identisch.
 - **Start-Screen (Rollenwahl)**: Beim Öffnen der App wählt man zuerst
   **Bearbeiter** oder **Betrachter 🔍**.
   - **Betrachter** gelangen ohne jede Anmeldung direkt zur Fahrtenliste und
@@ -30,17 +37,23 @@ direkt im Browser (HTML/CSS/JS), Daten liegen in Firebase Firestore und werden
   freigegebener Bearbeiter mit **"Sperren"**-Knopf (Freigabe jederzeit
   wieder entziehbar). Die Liste aktualisiert sich live.
 - **Standort wählen**: Direkt bei "Dein Name / deine Kasse" wählt man
-  **Neustadt** oder **Lambrecht** – das gilt für diese Zählstelle und wird
-  bei jeder Zählung mit protokolliert (sichtbar in der Live-Aktivität).
+  **Neustadt**, **Lambrecht** oder **Elmstein** – das gilt für diese
+  Zählstelle und wird bei jeder Zählung mit protokolliert (sichtbar in der
+  Live-Aktivität).
 - **Fahrt beitreten**: Bereits angelegte Fahrten werden als Liste angezeigt
   und können direkt angetippt werden. Eine Fahrt = **ein Zug an einem
-  Fahrtag** (z. B. "D3 am 16.08.2026") – Neustadt und Lambrecht zählen
-  dabei **gemeinsam in denselben Topf**, weil es derselbe Zug mit derselben
+  Fahrtag** (z. B. "D3 am 16.08.2026") – alle drei Standorte zählen dabei
+  **gemeinsam in denselben Topf**, weil es derselbe Zug mit derselben
   Sitzplatzzahl ist. Für eine neue Fahrt (nur als Bearbeiter möglich)
   "+ Neue Fahrt anlegen" antippen: Fahrtag wählen, **Zug** (D3 / D4 / D5 /
   D6 / Sonderzug) auswählen und die Wagen antippen, die heute mitfahren –
   die Sitzplatzzahl wird automatisch aus den Wagen summiert (abweichende
   Gesamtzahl lässt sich optional manuell eintragen).
+- **"🔍 Betrachter-Ansicht"**: Bearbeiter können während einer laufenden
+  Zählung mit einem Tipp oben in der Kopfzeile kurz in die große
+  Sitzplatzanzeige wechseln (z. B. um die Auslastung von weitem zu prüfen),
+  ohne die Fahrt zu verlassen. "✏️ Zur Zählansicht" bringt zurück zum
+  normalen Zählen.
 - **Einzelperson** antippen → **+1**
 - **Familie** antippen → **+4** Personen (ein Familienticket). Bei einer
   abweichenden Familiengröße über "abweichende Personenzahl…" einen
@@ -54,7 +67,22 @@ direkt im Browser (HTML/CSS/JS), Daten liegen in Firebase Firestore und werden
 - Oben werden **Fahrgäste gesamt**, **Sitzplätze** und **freie Plätze** live
   angezeigt (groß dargestellt); bei **50 %** und **75 %** Belegung
   erscheint ein farbiger Warnhinweis neben der Sitzplatzzahl, bei **100 %**
-  wechselt er zu **"Nur noch Stehplätze"**.
+  wechselt er zu **"Nur noch Stehplätze"**. Beim Erreichen von 100 % erscheint
+  zusätzlich einmalig ein Popup mit Warnton (Bearbeiter- und
+  Betrachter-Ansicht) – erst wenn die Fahrt danach wieder unter 100 % fällt
+  und erneut 100 % erreicht, löst die Warnung erneut aus.
+- **Vorreservierte Gruppen**: Beim Anlegen einer neuen Fahrt (oder jederzeit
+  danach im Panel **"Reservierte Gruppen"**) lässt sich für angemeldete
+  Gruppen ein Name und die Personenzahl hinterlegen. Diese erscheinen oben
+  in der Leiste als eigene, **graue "Reserviert"-Zahl** und werden bei den
+  50 %/75 %/100 %-Warnungen automatisch mitgerechnet (reservierte Plätze
+  gelten schon als vergeben, auch bevor die Gruppe da ist). Trifft eine
+  Gruppe ein, im Panel auf **"✓ Angekommen"** tippen: Die Reservierung
+  verschwindet aus der grauen Zahl und die Personen werden automatisch zur
+  normalen Gruppen-Zählung addiert (Sitzplätze bleiben dabei rechnerisch
+  gleich belegt – nur eben nicht mehr "reserviert", sondern "gezählt").
+  Kommt eine Gruppe nicht, lässt sich die Reservierung über **"✕"** ohne
+  Zählung entfernen.
 - **"Sitzplätze / Wagen nachträglich bearbeiten"**: Während der laufenden
   Zählung lässt sich die Wagen-Zusammenstellung (und damit die
   Sitzplatzzahl) noch ändern – z. B. wenn kurzfristig ein Wagen ausfällt.
@@ -220,8 +248,13 @@ fahrten/{fahrtId}/ereignisse/{eventId}   Live-Protokoll je Zählung
   kategorie: "einzelperson" | "familien" | "gruppen"
   anzahl: 1 | 4 | -1 | ...
   kasse: "Schalter 1"
-  standort: "neustadt" | "lambrecht"
+  standort: "neustadt" | "lambrecht" | "elmstein"
   zeit: Timestamp
+
+fahrten/{fahrtId}/reservierungen/{resId}   Vorreservierte Gruppen
+  name: "Schulklasse Musterstadt"
+  anzahl: 10
+  erstellt: Timestamp
 ```
 
 > Hinweis: Fahrten, die noch mit einer älteren Version der App angelegt

@@ -542,6 +542,7 @@ html[data-theme="classic"] .seats-value { font-size: 2.6rem; font-weight: 700; l
 html[data-theme="classic"] .seats-value-mono { font-family: var(--font-mono); }
 html[data-theme="classic"] .seats-divider { font-size: 2rem; color: var(--paper-dark); }
 html[data-theme="classic"] .seats-free .seats-value { color: var(--ok); }
+html[data-theme="classic"] .seats-reserved .seats-value { color: var(--ink-soft); }
 html[data-theme="classic"] .seats-banner.level-50 { background: #f6ead0; }
 html[data-theme="classic"] .seats-banner.level-75 { background: #f2dcc0; }
 html[data-theme="classic"] .seats-banner.level-100 { background: #f3d9d2; }
@@ -713,6 +714,42 @@ html[data-theme="classic"] .history-empty { color: var(--ink-soft); font-size: 0
 html[data-theme="classic"] .activity-time { font-family: var(--font-mono); color: var(--ink-soft); font-size: 0.78rem; }
 html[data-theme="classic"] .activity-delta-pos { color: var(--ok); font-weight: 700; font-family: var(--font-mono); }
 html[data-theme="classic"] .activity-delta-neg { color: var(--alert); font-weight: 700; font-family: var(--font-mono); }
+
+html[data-theme="classic"] .reservations-panel { margin: 16px 24px; max-width: 1052px; margin-left: auto; margin-right: auto; }
+html[data-theme="classic"] .reservations-list { list-style: none; margin: 0 0 12px; padding: 0; max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+html[data-theme="classic"] .reservation-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--paper);
+  border: 1px solid var(--paper-dark);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+html[data-theme="classic"] .reservation-name { flex: 1; font-weight: 600; font-size: 0.88rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-theme="classic"] .reservation-anzahl { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-soft); white-space: nowrap; }
+html[data-theme="classic"] .reservation-remove {
+  background: none;
+  border: 1px solid var(--paper-dark);
+  color: var(--alert);
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+html[data-theme="classic"] .reservation-remove:hover { background: #f3d9d2; }
+html[data-theme="classic"] .reservation-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+html[data-theme="classic"] .reservation-add-row input {
+  flex: 1;
+  min-width: 100px;
+  padding: 9px 10px;
+  border: 1px solid var(--paper-dark);
+  border-radius: 8px;
+  font-size: 0.88rem;
+  background: #fff;
+  color: var(--ink);
+}
+html[data-theme="classic"] .reservation-add-row input:focus { outline: 2px solid var(--brass); outline-offset: 1px; }
 html[data-theme="classic"] .history-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 html[data-theme="classic"] .history-table th {
   text-align: left;
@@ -885,6 +922,7 @@ html[data-theme="classic"] .viewer-seat-value {
   color: var(--ink);
 }
 html[data-theme="classic"] .viewer-seat-free .viewer-seat-value { color: var(--ok); }
+html[data-theme="classic"] .viewer-seat-reserved .viewer-seat-value { color: var(--steam-grey, #9aa0a6); }
 html[data-theme="classic"] .viewer.level-50 { background: #f6ead0; }
 html[data-theme="classic"] .viewer.level-75 { background: #f2dcc0; }
 html[data-theme="classic"] .viewer.level-100 { background: #f3d9d2; }
@@ -1457,6 +1495,7 @@ html[data-theme="modern"] .seats-value {
 html[data-theme="modern"] .seats-value-mono { font-family: var(--font-mono); }
 html[data-theme="modern"] .seats-divider { font-size: 2rem; color: var(--border-strong); align-self: center; margin-top: 20px; }
 html[data-theme="modern"] .seats-free .seats-value { color: #3ddc84; }
+html[data-theme="modern"] .seats-reserved .seats-value { color: var(--muted); background: var(--board-bg-soft); }
 html[data-theme="modern"] .seats-banner.level-50 { border-color: var(--signal-amber); }
 html[data-theme="modern"] .seats-banner.level-75 { border-color: var(--signal-red); }
 html[data-theme="modern"] .seats-banner.level-100 { background: var(--signal-red-bg); border-color: var(--signal-red); }
@@ -1617,6 +1656,42 @@ html[data-theme="modern"] .history-empty { color: var(--muted); font-size: 0.85r
 html[data-theme="modern"] .activity-time { font-family: var(--font-mono); color: var(--muted); font-size: 0.78rem; }
 html[data-theme="modern"] .activity-delta-pos { color: var(--signal-green); font-weight: 700; font-family: var(--font-mono); }
 html[data-theme="modern"] .activity-delta-neg { color: var(--signal-red); font-weight: 700; font-family: var(--font-mono); }
+
+html[data-theme="modern"] .reservations-panel { margin: 16px 24px; max-width: 1052px; margin-left: auto; margin-right: auto; }
+html[data-theme="modern"] .reservations-list { list-style: none; margin: 0 0 12px; padding: 0; max-height: 220px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+html[data-theme="modern"] .reservation-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--paper);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+html[data-theme="modern"] .reservation-name { flex: 1; font-weight: 600; font-size: 0.88rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-theme="modern"] .reservation-anzahl { font-family: var(--font-mono); font-size: 0.8rem; color: var(--ink-soft); white-space: nowrap; }
+html[data-theme="modern"] .reservation-remove {
+  background: none;
+  border: 1px solid var(--border-strong);
+  color: var(--signal-red);
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+}
+html[data-theme="modern"] .reservation-remove:hover { background: var(--signal-red-bg); }
+html[data-theme="modern"] .reservation-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
+html[data-theme="modern"] .reservation-add-row input {
+  flex: 1;
+  min-width: 100px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font-size: 0.88rem;
+  background: #fff;
+  color: var(--ink);
+}
+html[data-theme="modern"] .reservation-add-row input:focus { outline: 2px solid var(--rail-blue); outline-offset: 1px; }
 html[data-theme="modern"] .history-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
 html[data-theme="modern"] .history-table th {
   text-align: left;
@@ -1792,6 +1867,7 @@ html[data-theme="modern"] .viewer-seat-value {
   text-shadow: 0 0 18px rgba(255,176,32,0.35);
 }
 html[data-theme="modern"] .viewer-seat-free .viewer-seat-value { color: #6fd897; text-shadow: 0 0 18px rgba(111,216,151,0.35); }
+html[data-theme="modern"] .viewer-seat-reserved .viewer-seat-value { color: #9198a3; text-shadow: none; }
 html[data-theme="modern"] .viewer.level-50 .viewer-seat-block { border-color: rgba(201,126,16,0.5); }
 html[data-theme="modern"] .viewer.level-75 .viewer-seat-block { border-color: rgba(211,58,58,0.5); }
 html[data-theme="modern"] .viewer.level-100 { background: #1f1416; }
