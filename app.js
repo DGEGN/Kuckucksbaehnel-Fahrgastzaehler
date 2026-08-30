@@ -92,22 +92,13 @@ function clamp0(n) { return Math.max(0, n || 0); }
 // ---------------------------------------------------------
 // WAGEN-KATALOG
 // ---------------------------------------------------------
-// Hier die echten Wagen des Kuckucks-Bähnel eintragen: Name, Sitzplätze
-// und ein Bild (SVG-Platzhalter aus assets/wagen/ oder eigenes Foto,
-// z. B. "assets/wagen/mein-foto.jpg"). Reihenfolge = Anzeigereihenfolge.
+// Wird live aus der Firestore-Collection "wagen" geladen (siehe
+// subscribeToWagenKatalog). Admins pflegen die Wagen im Admin-Bereich der
+// App (Name, Sitzplätze, Bild) – kein Code-Eingriff mehr nötig.
 // ---------------------------------------------------------
-const WAGEN = [
-  { id: "wagen1", name: "Wagen 1", sitzplaetze: 44, bild: "assets/wagen/12240.jpg" },
-  { id: "wagen2", name: "Wagen 2", sitzplaetze: 72, bild: "assets/wagen/11150.jpg" },   
-  { id: "wagen3", name: "Wagen 3", sitzplaetze: 72, bild: "assets/wagen/11082.jpg" },
-  { id: "wagen4", name: "Wagen 4", sitzplaetze: 70, bild: "assets/wagen/2455.jpg" },
-  { id: "wagen5", name: "Wagen 5", sitzplaetze: 88, bild: "assets/wagen/4918.jpg" },
-  { id: "wagen6", name: "Wagen 6", sitzplaetze: 53, bild: "assets/wagen/82813.jpg" },
-  { id: "wagen7", name: "Wagen 7", sitzplaetze: 56, bild: "assets/wagen/85034.jpg" }, 
-  { id: "wagen8", name: "Wagen 8", sitzplaetze: 56, bild: "assets/wagen/85466.jpg" },
-  { id: "wagen9", name: "Wagen 9", sitzplaetze: 56, bild: "assets/wagen/84803.jpg" },
-  { id: "wagen10", name: "Wagen 10", sitzplaetze: 48, bild: "assets/wagen/301764.jpg" }
-];
+let WAGEN = [];
+let unsubWagenKatalog = null;
+let editingWagenId = null; // null = Neuanlage im Admin-Bereich, sonst Bearbeiten-Modus
 let selectedWagen = new Set();
 
 // ---------------------------------------------------------
@@ -147,6 +138,15 @@ const adminScreen = el("admin");
 const adminList = el("adminList");
 const adminBackBtn = el("adminBack");
 const openAdminBtn = el("openAdmin");
+const adminWagenList = el("adminWagenList");
+const adminWagenNameInput = el("adminWagenName");
+const adminWagenSitzplaetzeInput = el("adminWagenSitzplaetze");
+const adminWagenFileInput = el("adminWagenBild");
+const adminWagenFileNameEl = el("adminWagenFileName");
+const adminWagenSaveBtn = el("adminWagenSaveBtn");
+const adminWagenCancelBtn = el("adminWagenCancelBtn");
+const adminWagenInfo = el("adminWagenInfo");
+const adminWagenError = el("adminWagenError");
 
 const impressumOverlay = el("impressumOverlay");
 const impressumCloseBtn = el("impressumClose");
@@ -318,6 +318,11 @@ function initAuthScreen() {
 
   openAdminBtn.addEventListener("click", openAdminPanel);
   adminBackBtn.addEventListener("click", closeAdminPanel);
+  adminWagenSaveBtn.addEventListener("click", saveWagenForm);
+  adminWagenCancelBtn.addEventListener("click", cancelEditWagen);
+  adminWagenFileInput.addEventListener("change", () => {
+    adminWagenFileNameEl.textContent = adminWagenFileInput.files[0]?.name || "";
+  });
 
   openImpressumBtns.forEach((btn) => btn.addEventListener("click", () => impressumOverlay.classList.remove("hidden")));
   impressumCloseBtn.addEventListener("click", () => impressumOverlay.classList.add("hidden"));
@@ -487,8 +492,9 @@ async function doLogout() {
     if (unsubSetupList) { unsubSetupList(); unsubSetupList = null; }
     if (unsubAdminList) { unsubAdminList(); unsubAdminList = null; }
     if (unsubReservierungen) { unsubReservierungen(); unsubReservierungen = null; }
+    if (unsubWagenKatalog) { unsubWagenKatalog(); unsubWagenKatalog = null; }
     docRef = null; currentTripData = null; session = null; currentUser = null;
-    currentReservations = []; reservedSum = 0;
+    currentReservations = []; reservedSum = 0; WAGEN = [];
     fullOverlay.classList.add("hidden");
     await signOut(auth);
     showOnly(roleChoiceScreen);
@@ -521,10 +527,13 @@ function openAdminPanel() {
   unsubAdminList = onSnapshot(q, renderAdminList, () => {
     adminList.innerHTML = '<p class="trip-empty">Konten konnten nicht geladen werden.</p>';
   });
+  cancelEditWagen();
+  renderAdminWagenList();
 }
 
 function closeAdminPanel() {
   if (unsubAdminList) { unsubAdminList(); unsubAdminList = null; }
+  cancelEditWagen();
   showOnly(setupScreen);
 }
 
@@ -576,6 +585,160 @@ async function setFreigabe(uid, wert) {
   }
 }
 
+// ---------------------------------------------------------
+// Wagen-Katalog verwalten (Admin-Bereich)
+// ---------------------------------------------------------
+function subscribeToWagenKatalog() {
+  const q = query(collection(db, "wagen"), orderBy("erstellt", "asc"));
+  unsubWagenKatalog = onSnapshot(q, (snap) => {
+    WAGEN = [];
+    snap.forEach((docSnap) => WAGEN.push({ id: docSnap.id, ...docSnap.data() }));
+    renderWagenGrid();
+    if (!adminScreen.classList.contains("hidden")) renderAdminWagenList();
+  }, () => {
+    showToast("Wagen-Katalog konnte nicht geladen werden.");
+  });
+}
+
+function renderAdminWagenList() {
+  if (!WAGEN.length) {
+    adminWagenList.innerHTML = '<p class="trip-empty">Noch keine Wagen angelegt.</p>';
+    return;
+  }
+  adminWagenList.innerHTML = "";
+  WAGEN.forEach((w) => {
+    const item = document.createElement("div");
+    item.className = "admin-wagen-item";
+    item.innerHTML = `
+      <img src="${w.bild}" class="admin-wagen-thumb" alt="${escapeHtml(w.name)}">
+      <div class="admin-wagen-meta">
+        <span class="admin-wagen-name">${escapeHtml(w.name)}</span>
+        <span class="admin-wagen-seats">${clamp0(w.sitzplaetze)} Plätze</span>
+      </div>
+      <button type="button" class="btn btn-ghost btn-small" data-edit-wagen="${w.id}">✏️</button>
+      <button type="button" class="btn btn-danger-outline btn-small" data-delete-wagen="${w.id}">🗑</button>
+    `;
+    adminWagenList.appendChild(item);
+  });
+  adminWagenList.querySelectorAll("[data-edit-wagen]").forEach((btn) => {
+    btn.addEventListener("click", () => startEditWagen(btn.dataset.editWagen));
+  });
+  adminWagenList.querySelectorAll("[data-delete-wagen]").forEach((btn) => {
+    btn.addEventListener("click", () => deleteWagen(btn.dataset.deleteWagen));
+  });
+}
+
+function startEditWagen(wagenId) {
+  const w = WAGEN.find((x) => x.id === wagenId);
+  if (!w) return;
+  editingWagenId = wagenId;
+  adminWagenNameInput.value = w.name;
+  adminWagenSitzplaetzeInput.value = w.sitzplaetze;
+  adminWagenFileInput.value = "";
+  adminWagenFileNameEl.textContent = "Bild unverändert lassen oder neues Bild wählen";
+  adminWagenSaveBtn.textContent = "Änderungen speichern";
+  adminWagenCancelBtn.classList.remove("hidden");
+  adminWagenError.textContent = ""; adminWagenInfo.textContent = "";
+  adminWagenNameInput.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+function cancelEditWagen() {
+  editingWagenId = null;
+  adminWagenNameInput.value = "";
+  adminWagenSitzplaetzeInput.value = "";
+  adminWagenFileInput.value = "";
+  adminWagenFileNameEl.textContent = "";
+  adminWagenSaveBtn.textContent = "+ Wagen hinzufügen";
+  adminWagenCancelBtn.classList.add("hidden");
+  adminWagenError.textContent = ""; adminWagenInfo.textContent = "";
+}
+
+function deleteWagen(wagenId) {
+  openConfirm(
+    "Diesen Wagen wirklich löschen? Falls er in bestehenden Fahrten verwendet wird, verschwindet er dort einfach aus der Auswahl.",
+    async () => {
+      try {
+        await deleteDoc(doc(db, "wagen", wagenId));
+        showToast("Wagen gelöscht.");
+        if (editingWagenId === wagenId) cancelEditWagen();
+      } catch (err) {
+        showToast("Fehler: " + err.message);
+      }
+    },
+    "Ja, löschen"
+  );
+}
+
+// Verkleinert/komprimiert ein Bild im Browser (Canvas), damit es sicher
+// als Base64-Data-URI in ein Firestore-Dokument passt (Limit ca. 1 MB).
+function compressImageFile(file, maxWidth, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("Datei konnte nicht gelesen werden."));
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = () => reject(new Error("Datei ist kein gültiges Bild."));
+      img.onload = () => {
+        const scale = Math.min(1, maxWidth / img.width);
+        const w = Math.max(1, Math.round(img.width * scale));
+        const h = Math.max(1, Math.round(img.height * scale));
+        const canvas = document.createElement("canvas");
+        canvas.width = w; canvas.height = h;
+        canvas.getContext("2d").drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL("image/jpeg", quality));
+      };
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+async function getCompressedWagenImage(file) {
+  // Mehrere Qualitätsstufen probieren, bis das Ergebnis sicher unter dem
+  // Firestore-Dokumentlimit liegt.
+  const stufen = [[480, 0.72], [360, 0.6], [280, 0.5], [200, 0.4]];
+  for (const [maxWidth, quality] of stufen) {
+    const dataUrl = await compressImageFile(file, maxWidth, quality);
+    if (dataUrl.length < 700000) return dataUrl;
+  }
+  throw new Error("Das Bild ist auch verkleinert noch zu groß. Bitte ein anderes Foto versuchen.");
+}
+
+async function saveWagenForm() {
+  adminWagenError.textContent = ""; adminWagenInfo.textContent = "";
+  const name = adminWagenNameInput.value.trim();
+  const sitzplaetze = parseInt(adminWagenSitzplaetzeInput.value, 10);
+  const file = adminWagenFileInput.files[0] || null;
+
+  if (!name) { adminWagenError.textContent = "Bitte einen Namen eingeben."; return; }
+  if (!sitzplaetze || sitzplaetze < 1) { adminWagenError.textContent = "Bitte eine gültige Sitzplatzzahl eingeben."; return; }
+  if (!editingWagenId && !file) { adminWagenError.textContent = "Bitte ein Bild auswählen."; return; }
+
+  const wasEditing = !!editingWagenId;
+  adminWagenSaveBtn.disabled = true;
+  adminWagenSaveBtn.textContent = wasEditing ? "Speichert…" : "Wird hinzugefügt…";
+  try {
+    let bild = null;
+    if (file) bild = await getCompressedWagenImage(file);
+
+    if (wasEditing) {
+      const updateData = { name, sitzplaetze };
+      if (bild) updateData.bild = bild;
+      await updateDoc(doc(db, "wagen", editingWagenId), updateData);
+      showToast("Wagen aktualisiert.");
+    } else {
+      await addDoc(collection(db, "wagen"), { name, sitzplaetze, bild, erstellt: serverTimestamp() });
+      showToast("Wagen hinzugefügt.");
+    }
+    cancelEditWagen();
+  } catch (err) {
+    adminWagenError.textContent = "Fehler: " + err.message;
+  } finally {
+    adminWagenSaveBtn.disabled = false;
+    adminWagenSaveBtn.textContent = wasEditing ? "Änderungen speichern" : "+ Wagen hinzufügen";
+  }
+}
+
 // Wechselt vom Anmelde- bzw. Rollenwahl-Bildschirm in die Fahrtenliste.
 function enterSetupForRole(rolle) {
   showOnly(setupScreen);
@@ -599,6 +762,7 @@ function enterSetupForRole(rolle) {
   if (saved?.standort) selectStandort(saved.standort);
 
   subscribeToExistingTrips();
+  if (!unsubWagenKatalog) subscribeToWagenKatalog();
 }
 
 // ===========================================================
@@ -646,6 +810,11 @@ function setNewTripVisible(visible) {
 }
 
 function renderWagenGrid() {
+  if (!WAGEN.length) {
+    wagenGrid.innerHTML = '<p class="trip-empty">Noch keine Wagen angelegt. Ein Admin kann sie im Admin-Bereich hinzufügen.</p>';
+    updateWagenTotal();
+    return;
+  }
   wagenGrid.innerHTML = "";
   WAGEN.forEach((w) => {
     const tile = document.createElement("button");
@@ -711,6 +880,10 @@ function openWagenEdit() {
 function closeWagenEdit() { wagenEditOverlay.classList.add("hidden"); }
 
 function renderWagenEditGrid() {
+  if (!WAGEN.length) {
+    wagenEditGrid.innerHTML = '<p class="trip-empty">Noch keine Wagen angelegt.</p>';
+    return;
+  }
   wagenEditGrid.innerHTML = "";
   WAGEN.forEach((w) => {
     const tile = document.createElement("button");

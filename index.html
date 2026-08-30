@@ -233,6 +233,41 @@
       <p class="trip-empty">Lade Konten…</p>
     </div>
 
+    <div class="setup-divider"><span>Wagen-Katalog</span></div>
+
+    <h2 class="trip-heading">Wagen verwalten</h2>
+    <p class="trip-hint">Erscheinen danach sofort in der Wagen-Auswahl beim Anlegen einer Fahrt.</p>
+
+    <div id="adminWagenList" class="admin-wagen-list">
+      <p class="trip-empty">Lade Wagen…</p>
+    </div>
+
+    <div class="admin-wagen-form">
+      <div class="field">
+        <label for="adminWagenName">Name</label>
+        <input type="text" id="adminWagenName" placeholder="z. B. Wagen 5" maxlength="40">
+      </div>
+      <div class="field">
+        <label for="adminWagenSitzplaetze">Sitzplätze</label>
+        <input type="number" id="adminWagenSitzplaetze" placeholder="z. B. 32" min="1" step="1" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label>Bild</label>
+        <label class="admin-wagen-file-label">
+          📷 Bild auswählen
+          <input type="file" id="adminWagenBild" accept="image/*" class="admin-wagen-file-input">
+        </label>
+        <span id="adminWagenFileName" class="admin-wagen-filename"></span>
+        <p class="field-hint">Wird beim Hochladen automatisch verkleinert, kein Foto-Zuschnitt nötig.</p>
+      </div>
+      <div class="admin-wagen-form-actions">
+        <button type="button" id="adminWagenCancelBtn" class="btn btn-ghost btn-small hidden">Abbrechen</button>
+        <button type="button" id="adminWagenSaveBtn" class="btn btn-brass btn-small">+ Wagen hinzufügen</button>
+      </div>
+      <p id="adminWagenInfo" class="setup-info"></p>
+      <p id="adminWagenError" class="setup-error"></p>
+    </div>
+
     <button type="button" id="adminBack" class="link-btn toggle-new-trip">‹ Zurück</button>
   </div>
 </div>

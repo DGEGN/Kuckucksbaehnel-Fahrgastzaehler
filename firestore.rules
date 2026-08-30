@@ -56,6 +56,26 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // ---------------------------------------------------------
+    // Wagen-Katalog: von Admins im Admin-Bereich gepflegt (Name,
+    // Sitzplätze, Bild als komprimiertes Base64-Data-URI). Lesen dürfen
+    // alle angemeldeten Konten, da die Wagen-Auswahl beim Anlegen einer
+    // Fahrt angezeigt wird.
+    // ---------------------------------------------------------
+    match /wagen/{wagenId} {
+      allow read: if request.auth != null;
+
+      allow create: if istAdmin()
+        && request.resource.data.keys().hasAll(['name', 'sitzplaetze', 'bild'])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.sitzplaetze is int
+        && request.resource.data.sitzplaetze > 0;
+
+      allow update: if istAdmin();
+      allow delete: if istAdmin();
+    }
+
     // Eine Fahrt = ein Zug an einem Fahrtag (Dokument-ID: "YYYY-MM-DD_zug"),
     // gemeinsam gezählt für Neustadt UND Lambrecht (derselbe Zug, dieselben
     // Sitzplätze). Der Standort ist stattdessen eine Eigenschaft jeder

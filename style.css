@@ -295,6 +295,38 @@ html[data-theme="classic"] .admin-item {
   padding: 10px 12px;
 }
 html[data-theme="classic"] .admin-email { font-size: 0.85rem; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+html[data-theme="classic"] .admin-wagen-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 18px; max-height: 320px; overflow-y: auto; }
+html[data-theme="classic"] .admin-wagen-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid var(--paper-dark);
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+html[data-theme="classic"] .admin-wagen-thumb { width: 56px; height: 42px; object-fit: cover; border-radius: 6px; flex-shrink: 0; background: var(--paper); }
+html[data-theme="classic"] .admin-wagen-meta { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+html[data-theme="classic"] .admin-wagen-name { font-weight: 600; font-size: 0.88rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-theme="classic"] .admin-wagen-seats { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-soft); }
+html[data-theme="classic"] .admin-wagen-form { text-align: left; background: var(--paper); border-radius: 10px; padding: 14px; margin-bottom: 8px; }
+html[data-theme="classic"] .admin-wagen-file-label {
+  display: inline-block;
+  padding: 9px 14px;
+  border: 1px solid var(--paper-dark);
+  border-radius: 8px;
+  background: #fff;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+html[data-theme="classic"] .admin-wagen-file-label:hover { border-color: var(--brass); }
+html[data-theme="classic"] .admin-wagen-file-input { display: none; }
+html[data-theme="classic"] .admin-wagen-filename { display: block; font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 6px; }
+html[data-theme="classic"] .admin-wagen-form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
 html[data-theme="classic"] .impressum-card { max-width: 460px; text-align: left; }
 html[data-theme="classic"] .impressum-title { color: var(--forest); margin-bottom: 14px; text-align: center; }
 html[data-theme="classic"] .impressum-body { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.5; max-height: 50vh; overflow-y: auto; }
@@ -1231,6 +1263,38 @@ html[data-theme="modern"] .admin-item {
   padding: 10px 12px;
 }
 html[data-theme="modern"] .admin-email { font-size: 0.85rem; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+html[data-theme="modern"] .admin-wagen-list { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 18px; max-height: 320px; overflow-y: auto; }
+html[data-theme="modern"] .admin-wagen-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+html[data-theme="modern"] .admin-wagen-thumb { width: 56px; height: 42px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: var(--paper); }
+html[data-theme="modern"] .admin-wagen-meta { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+html[data-theme="modern"] .admin-wagen-name { font-weight: 600; font-size: 0.88rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html[data-theme="modern"] .admin-wagen-seats { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-soft); }
+html[data-theme="modern"] .admin-wagen-form { text-align: left; background: var(--paper); border-radius: 14px; padding: 14px; margin-bottom: 8px; }
+html[data-theme="modern"] .admin-wagen-file-label {
+  display: inline-block;
+  padding: 9px 14px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: #fff;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--ink-soft);
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+html[data-theme="modern"] .admin-wagen-file-label:hover { border-color: var(--rail-blue); }
+html[data-theme="modern"] .admin-wagen-file-input { display: none; }
+html[data-theme="modern"] .admin-wagen-filename { display: block; font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 6px; }
+html[data-theme="modern"] .admin-wagen-form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
 html[data-theme="modern"] .impressum-card { max-width: 460px; text-align: left; }
 html[data-theme="modern"] .impressum-title { color: var(--ink); margin-bottom: 14px; text-align: center; }
 html[data-theme="modern"] .impressum-body { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.5; max-height: 50vh; overflow-y: auto; }
