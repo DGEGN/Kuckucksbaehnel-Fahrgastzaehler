@@ -327,6 +327,19 @@ html[data-theme="classic"] .admin-wagen-file-label:hover { border-color: var(--b
 html[data-theme="classic"] .admin-wagen-file-input { display: none; }
 html[data-theme="classic"] .admin-wagen-filename { display: block; font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 6px; }
 html[data-theme="classic"] .admin-wagen-form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+
+html[data-theme="classic"] .admin-puffer-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+html[data-theme="classic"] .admin-puffer-row input {
+  width: 90px;
+  padding: 9px 10px;
+  border: 1px solid var(--paper-dark);
+  border-radius: 8px;
+  font-size: 0.92rem;
+  background: #fff;
+  color: var(--ink);
+}
+html[data-theme="classic"] .admin-puffer-row input:focus { outline: 2px solid var(--brass); outline-offset: 1px; }
+html[data-theme="classic"] .admin-puffer-percent { font-weight: 600; color: var(--ink-soft); margin-right: auto; }
 html[data-theme="classic"] .impressum-card { max-width: 460px; text-align: left; }
 html[data-theme="classic"] .impressum-title { color: var(--forest); margin-bottom: 14px; text-align: center; }
 html[data-theme="classic"] .impressum-body { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.5; max-height: 50vh; overflow-y: auto; }
@@ -557,6 +570,20 @@ html[data-theme="classic"] .conn-status {
 html[data-theme="classic"] .conn-connecting { background: rgba(255,255,255,0.12); color: #dcd4b8; }
 html[data-theme="classic"] .conn-online { background: rgba(60, 107, 71, 0.35); color: #bfe3c8; }
 html[data-theme="classic"] .conn-offline { background: rgba(168, 58, 44, 0.35); color: #f3c6bf; }
+
+html[data-theme="classic"] .archiv-banner {
+  background: var(--sandstone);
+  color: #fff2e8;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.86rem;
+  padding: 10px 16px;
+}
+html[data-theme="classic"] .viewer-archiv-banner { background: var(--alert); color: #fff; margin: 0 16px; border-radius: 12px; }
+html[data-theme="classic"] .trip-item-archiv { color: var(--alert); font-weight: 700; }
+html[data-theme="classic"] button:disabled,
+html[data-theme="classic"] input:disabled { opacity: 0.45; cursor: not-allowed; }
+
 html[data-theme="classic"] .seats-banner {
   display: flex;
   align-items: center;
@@ -1296,6 +1323,19 @@ html[data-theme="modern"] .admin-wagen-file-label:hover { border-color: var(--ra
 html[data-theme="modern"] .admin-wagen-file-input { display: none; }
 html[data-theme="modern"] .admin-wagen-filename { display: block; font-size: 0.78rem; color: var(--ink-soft); margin-bottom: 6px; }
 html[data-theme="modern"] .admin-wagen-form-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
+
+html[data-theme="modern"] .admin-puffer-row { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+html[data-theme="modern"] .admin-puffer-row input {
+  width: 90px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  font-size: 0.92rem;
+  background: #fff;
+  color: var(--ink);
+}
+html[data-theme="modern"] .admin-puffer-row input:focus { outline: 2px solid var(--rail-blue); outline-offset: 1px; }
+html[data-theme="modern"] .admin-puffer-percent { font-weight: 600; color: var(--ink-soft); margin-right: auto; }
 html[data-theme="modern"] .impressum-card { max-width: 460px; text-align: left; }
 html[data-theme="modern"] .impressum-title { color: var(--ink); margin-bottom: 14px; text-align: center; }
 html[data-theme="modern"] .impressum-body { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.5; max-height: 50vh; overflow-y: auto; }
@@ -1533,6 +1573,19 @@ html[data-theme="modern"] .conn-status {
 html[data-theme="modern"] .conn-connecting { background: rgba(255,255,255,0.14); color: #fff; }
 html[data-theme="modern"] .conn-online { background: rgba(31, 139, 76, 0.35); color: #d5f1e0; }
 html[data-theme="modern"] .conn-offline { background: rgba(211, 58, 58, 0.35); color: #fbdada; }
+
+html[data-theme="modern"] .archiv-banner {
+  background: var(--signal-amber);
+  color: #241b0c;
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.86rem;
+  padding: 10px 16px;
+}
+html[data-theme="modern"] .viewer-archiv-banner { background: var(--signal-red); color: #fff; margin: 0 16px; border-radius: 14px; }
+html[data-theme="modern"] .trip-item-archiv { color: var(--signal-red); font-weight: 700; }
+html[data-theme="modern"] button:disabled,
+html[data-theme="modern"] input:disabled { opacity: 0.45; cursor: not-allowed; }
 html[data-theme="modern"] .seats-banner {
   display: flex;
   align-items: center;

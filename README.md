@@ -105,6 +105,16 @@ direkt im Browser (HTML/CSS/JS), Daten liegen in Firebase Firestore und werden
 - **Zählung dieser Fahrt zurücksetzen** setzt nur die Fahrgastzahlen auf 0
   (die Sitzplatzanzahl bleibt erhalten) – ebenfalls mit **doppelter
   Bestätigung**.
+- **Automatische Archivierung**: Sobald der Fahrtag einer Fahrt vorbei ist,
+  wird sie automatisch **schreibgeschützt** – kein Zählen, kein Bearbeiten
+  der Wagen, kein Zurücksetzen, keine Reservierungen, kein Löschen mehr
+  möglich. Ein auffälliges Banner ("🔒 Diese Fahrt ist archiviert…")
+  erscheint automatisch, auch wenn eine Fahrt seit dem Vortag offen im
+  Browser stehen geblieben ist (Prüfung läuft im Hintergrund jede Minute
+  weiter, kein Neuladen nötig). **Ansehen, "📄 Bericht exportieren" und
+  "CSV exportieren" funktionieren weiterhin uneingeschränkt** – nur
+  Änderungen sind gesperrt. In der Liste "Fahrt beitreten" sind archivierte
+  Fahrten zusätzlich mit "🔒 archiviert" gekennzeichnet.
 - **Bedienungsanleitung** und **Impressum** sind unten auf der Rollenwahl-
   und der Setup-Seite verlinkt (siehe eigene Abschnitte unten).
 
@@ -252,6 +262,9 @@ wagen/{wagenId}                       Wagen-Katalog, im Admin-Bereich gepflegt
   bild: "data:image/jpeg;base64,...."  Komprimiertes Foto (siehe unten)
   erstellt: Timestamp
 
+einstellungen/global                  Globale App-Einstellungen
+  sitzplatzReservePct: 10              Sitzplatz-Puffer in Prozent (0-99)
+
 fahrten/{fahrtag}_{zug}                z. B. "2026-08-16_d3"
   fahrtag: "2026-08-16"
   zug: "d3" | "d4" | "d5" | "d6" | "sonderzug"
@@ -328,6 +341,63 @@ Firestore-Limit von 1 MB bleibt). Das funktioniert komplett im kostenlosen
 Firebase-Tarif, ohne Firebase Storage / Blaze-Tarif zu benötigen — die
 Bildqualität ist dafür etwas einfacher als bei einer Speicherung in voller
 Auflösung.
+
+## Sitzplatz-Puffer (Admin-Bereich)
+
+Im Admin-Bereich, direkt unter "Wagen verwalten", lässt sich unter
+**"Angebotene Sitzplätze"** ein Prozentsatz (0–99 %) festlegen, der als
+Reserve von der Wagen-Kapazität zurückgehalten wird. Beispiel: 4 Wagen mit
+zusammen 80 Sitzplätzen und 10 % Puffer → die App schlägt beim Anlegen
+bzw. nachträglichen Bearbeiten einer Fahrt automatisch **72** Sitzplätze
+vor (10 % = 8 Plätze werden als Reserve nicht angeboten). Der Hinweistext
+unter der Sitzplatzzahl zeigt dabei immer die Rechnung
+("Wagen-Kapazität: 80 · abzüglich 10 % Reserve = 72 Sitzplätze").
+
+- Der Puffer gilt **global** für alle Fahrten und wird sofort wirksam,
+  sobald er gespeichert wird.
+- Er wirkt sich **nur auf die automatische Berechnung aus den Wagen aus**.
+  Wird stattdessen "abweichende Gesamtzahl…" genutzt, um die Sitzplatzzahl
+  manuell einzutragen, greift der Puffer nicht – der manuell eingetragene
+  Wert wird unverändert übernommen.
+- Bereits angelegte Fahrten ändern sich durch eine spätere Anpassung des
+  Prozentsatzes **nicht automatisch** – nur bei der (nachträglichen)
+  Neuberechnung aus der Wagen-Auswahl wird der dann aktuelle Prozentsatz
+  angewendet.
+- Der Wert liegt in Firestore unter `einstellungen/global` (Feld
+  `sitzplatzReservePct`) und ist nur für Admins änderbar.
+
+## Automatische Archivierung vergangener Fahrten
+
+Fahrten, deren Fahrtag vorbei ist, werden automatisch schreibgeschützt –
+zählen, Wagen ändern, zurücksetzen, Reservierungen und Löschen sind dann
+nicht mehr möglich. Lesen, "📄 Bericht exportieren" und "CSV exportieren"
+bleiben uneingeschränkt erhalten.
+
+**Warum keine geplante Aufgabe ("um Mitternacht ausführen")?** Eine
+zeitgesteuerte Cloud Function würde den kostenpflichtigen Blaze-Tarif bei
+Firebase voraussetzen (Cloud Scheduler ist nicht Teil des kostenlosen
+Spark-Tarifs). Stattdessen prüfen sowohl die App als auch – entscheidend –
+die **Firestore-Regeln** bei jedem Zugriff live: "Liegt der Fahrtag dieser
+Fahrt vor dem heutigen Datum?" Das läuft ganz ohne geplante Aufgabe,
+Server oder zusätzliche Kosten und ist genauso zuverlässig, weil die
+Firestore-Regeln selbst die Sperre durchsetzen – nicht nur die
+Bedienoberfläche.
+
+- In der App läuft zusätzlich ein Minuten-Timer, der die Anzeige
+  automatisch aktualisiert, falls eine Fahrt über Mitternacht hinweg offen
+  im Browser stehen bleibt (kein Neuladen der Seite nötig).
+- **Genauigkeit rund um Mitternacht**: Die Firestore-Regeln rechnen dabei
+  in UTC mit einem Sicherheitsversatz. In der Praxis bedeutet das: Eine
+  Fahrt bleibt tendenziell **noch ein bis zwei Stunden nach echter
+  Mitternacht (Europe/Berlin) bearbeitbar**, wird aber nie zu früh
+  gesperrt. Für den laufenden Betrieb (Zählen tagsüber, Abschluss am
+  selben Abend) spielt das keine Rolle; falls exaktere Zeitzonen-Logik
+  gewünscht ist, wäre dafür künftig doch eine Cloud Function nötig.
+- Es gibt aktuell **keine Möglichkeit, eine archivierte Fahrt in der App
+  wieder zu entsperren**. Falls das im Ausnahmefall nötig ist, kann ein
+  Admin in der Firebase-Konsole das Feld `fahrtag` des betreffenden
+  Fahrt-Dokuments (`fahrten/{fahrtId}`) vorübergehend auf das heutige
+  Datum setzen, bearbeiten, und danach wieder zurücksetzen.
 
 ## Anpassen
 

@@ -187,6 +187,7 @@
           <span>Sitzplätze gesamt</span>
           <span id="wagenTotalSeats" class="wagen-total-value">0</span>
         </div>
+        <p id="wagenReserveHint" class="field-hint"></p>
         <button type="button" class="card-link" id="toggleSeatOverride">abweichende Gesamtzahl…</button>
         <input type="number" id="sitzplaetze" class="hidden" min="0" step="1">
         <div id="seatOverrideField" class="field seat-override hidden">
@@ -268,6 +269,23 @@
       <p id="adminWagenError" class="setup-error"></p>
     </div>
 
+    <div class="setup-divider"><span>Sitzplatz-Puffer</span></div>
+
+    <h2 class="trip-heading">Angebotene Sitzplätze</h2>
+    <p class="trip-hint">
+      Prozentsatz der Wagen-Kapazität, der als Reserve zurückgehalten wird.
+      Wird automatisch von der Sitzplatzzahl abgezogen, sobald Wagen für eine
+      Fahrt ausgewählt werden (bei 0 % keine Änderung). Eine manuell
+      eingetragene abweichende Gesamtzahl ist davon nicht betroffen.
+    </p>
+    <div class="admin-puffer-row">
+      <input type="number" id="adminPufferPct" min="0" max="99" step="1" value="0">
+      <span class="admin-puffer-percent">%</span>
+      <button type="button" id="adminPufferSaveBtn" class="btn btn-brass btn-small">Speichern</button>
+    </div>
+    <p id="adminPufferInfo" class="setup-info"></p>
+    <p id="adminPufferError" class="setup-error"></p>
+
     <button type="button" id="adminBack" class="link-btn toggle-new-trip">‹ Zurück</button>
   </div>
 </div>
@@ -308,6 +326,10 @@
 
     <span id="connStatus" class="conn-status conn-connecting">verbinde…</span>
   </header>
+
+  <div id="archivBanner" class="archiv-banner hidden">
+    🔒 Diese Fahrt ist archiviert (Fahrtag vorbei) – nur noch Ansicht, Bericht und CSV-Export möglich.
+  </div>
 
   <section class="seats-banner" id="seatsBanner">
     <div class="seats-item">
@@ -442,6 +464,10 @@
     <span id="viewerConnStatus" class="conn-status conn-connecting">verbinde…</span>
   </div>
 
+  <div id="viewerArchivBanner" class="archiv-banner viewer-archiv-banner hidden">
+    🔒 Diese Fahrt ist archiviert (Fahrtag vorbei)
+  </div>
+
   <main class="viewer-main">
     <div class="viewer-seats">
       <div class="viewer-seat-block">
@@ -474,6 +500,7 @@
       <span>Sitzplätze gesamt</span>
       <span id="wagenEditTotalSeats" class="wagen-total-value">0</span>
     </div>
+    <p id="wagenEditReserveHint" class="field-hint"></p>
     <button type="button" class="card-link" id="toggleSeatEditOverride">abweichende Gesamtzahl…</button>
     <div id="seatEditOverrideField" class="field seat-override hidden">
       <label for="sitzplaetzeEditOverride">Sitzplätze manuell festlegen</label>
@@ -556,6 +583,7 @@
     </div>
   </div>
 </div>
+
 
 <!-- Vollbesetzt-Warnung -->
 <div id="fullOverlay" class="dialog-overlay hidden">

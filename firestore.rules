@@ -27,6 +27,23 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------
+    // Archivierung: Statt einer geplanten Aufgabe um Mitternacht (würde den
+    // kostenpflichtigen Blaze-Tarif erfordern) wird bei jedem Schreibzugriff
+    // live geprüft, ob der Fahrtag bereits vorbei ist. Rechnet in UTC mit
+    // +24h Sicherheitsversatz, damit eine Fahrt im Zweifel eher etwas länger
+    // bearbeitbar bleibt, als zu früh gesperrt zu werden.
+    // ---------------------------------------------------------
+    function istDatumArchiviert(fahrtagStr) {
+      let teile = fahrtagStr.split('-');
+      let tagesende = timestamp.date(int(teile[0]), int(teile[1]), int(teile[2])) + duration.value(24, 'h');
+      return request.time >= tagesende;
+    }
+
+    function istFahrtArchiviert(fahrtId) {
+      return istDatumArchiviert(get(/databases/$(database)/documents/fahrten/$(fahrtId)).data.fahrtag);
+    }
+
+    // ---------------------------------------------------------
     // Benutzerprofile: bei der Registrierung mit freigegeben=false angelegt,
     // nur ein Admin darf das Feld anschließend auf true (oder zurück auf
     // false) setzen.
@@ -76,6 +93,21 @@ service cloud.firestore {
       allow delete: if istAdmin();
     }
 
+    // ---------------------------------------------------------
+    // Globale App-Einstellungen (z. B. Sitzplatz-Puffer in Prozent).
+    // Nur ein Dokument "global", von Admins im Admin-Bereich gepflegt.
+    // ---------------------------------------------------------
+    match /einstellungen/{docId} {
+      allow read: if request.auth != null;
+
+      allow create, update: if istAdmin()
+        && request.resource.data.sitzplatzReservePct is int
+        && request.resource.data.sitzplatzReservePct >= 0
+        && request.resource.data.sitzplatzReservePct <= 99;
+
+      allow delete: if false;
+    }
+
     // Eine Fahrt = ein Zug an einem Fahrtag (Dokument-ID: "YYYY-MM-DD_zug"),
     // gemeinsam gezählt für Neustadt UND Lambrecht (derselbe Zug, dieselben
     // Sitzplätze). Der Standort ist stattdessen eine Eigenschaft jeder
@@ -89,24 +121,27 @@ service cloud.firestore {
              ['fahrtag', 'zug', 'sitzplaetze', 'einzelperson', 'familien', 'gruppen'])
         && request.resource.data.sitzplaetze is int
         && request.resource.data.sitzplaetze > 0
-        && request.resource.data.zug in ['d3', 'd4', 'd5', 'd6', 'sonderzug'];
+        && request.resource.data.zug in ['d3', 'd4', 'd5', 'd6', 'sonderzug']
+        && !istDatumArchiviert(request.resource.data.fahrtag);
 
-      // Zählstände werden per increment()/updateDoc laufend aktualisiert
-      allow update: if istBearbeiter();
+      // Zählstände werden per increment()/updateDoc laufend aktualisiert –
+      // nicht mehr möglich, sobald der Fahrtag als archiviert gilt.
+      allow update: if istBearbeiter() && !istDatumArchiviert(resource.data.fahrtag);
 
-      // Fahrten können über die App gelöscht werden (inkl. ihres Aktivitätsprotokolls)
-      allow delete: if istBearbeiter();
+      // Löschen (inkl. Aktivitätsprotokoll) ebenfalls nur vor der Archivierung
+      allow delete: if istBearbeiter() && !istDatumArchiviert(resource.data.fahrtag);
 
       // Live-Aktivitätsprotokoll je Fahrt
       match /ereignisse/{eventId} {
         allow read: if request.auth != null;
 
         allow create: if istBearbeiter()
+          && !istFahrtArchiviert(fahrtId)
           && request.resource.data.keys().hasAll(['kategorie', 'anzahl', 'kasse'])
           && request.resource.data.kategorie in ['einzelperson', 'familien', 'gruppen', 'erwachsene', 'kinder'];
 
         // Löschen wird für "Rückgängig" und "Zurücksetzen" benötigt
-        allow delete: if istBearbeiter();
+        allow delete: if istBearbeiter() && !istFahrtArchiviert(fahrtId);
         allow update: if false;
       }
 
@@ -116,6 +151,7 @@ service cloud.firestore {
         allow read: if request.auth != null;
 
         allow create: if istBearbeiter()
+          && !istFahrtArchiviert(fahrtId)
           && request.resource.data.keys().hasAll(['name', 'anzahl'])
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
@@ -123,7 +159,7 @@ service cloud.firestore {
           && request.resource.data.anzahl > 0;
 
         // Bestätigen/Entfernen läuft über Löschen (+ ggf. separate Zählung)
-        allow delete: if istBearbeiter();
+        allow delete: if istBearbeiter() && !istFahrtArchiviert(fahrtId);
         allow update: if false;
       }
     }

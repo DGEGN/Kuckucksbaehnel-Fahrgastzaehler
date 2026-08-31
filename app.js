@@ -18,7 +18,7 @@ import {
 // Firebase-Konsole -> Projekteinstellungen -> "Meine Apps" -> Web-App -> Konfiguration
 // Diese Werte sind KEINE Geheimnisse, Zugriffsschutz erfolgt über die
 // Firestore-Sicherheitsregeln (siehe firestore.rules / README.md).
-// ---------------------------------------------------------
+// ---------------------------------------------------------const firebaseConfig = {
 const firebaseConfig = {
   apiKey: "AIzaSyCpfHTMh8zx2hmcxjF-ayIjW0lFtJcBtSM",
   authDomain: "kuckuck-fahrkarten.firebaseapp.com",
@@ -75,6 +75,13 @@ function todayISO() {
   });
   return fmt.format(new Date());
 }
+
+// Eine Fahrt gilt als archiviert, sobald ihr Fahrtag (Europe/Berlin) vorbei
+// ist. Rein clientseitig zur sofortigen UI-Reaktion – die eigentliche
+// Durchsetzung übernehmen die Firestore-Regeln (siehe firestore.rules).
+function isFahrtArchiviert(fahrtagStr) {
+  return !!fahrtagStr && fahrtagStr < todayISO();
+}
 function formatDateDE(iso) {
   if (!iso) return "–";
   const [y, m, d] = iso.split("-");
@@ -98,6 +105,8 @@ function clamp0(n) { return Math.max(0, n || 0); }
 // ---------------------------------------------------------
 let WAGEN = [];
 let unsubWagenKatalog = null;
+let sitzplatzReservePct = 0; // globaler Sitzplatz-Puffer in Prozent (0-99), von Admins gepflegt
+let unsubEinstellungen = null;
 let editingWagenId = null; // null = Neuanlage im Admin-Bereich, sonst Bearbeiten-Modus
 let selectedWagen = new Set();
 
@@ -147,6 +156,10 @@ const adminWagenSaveBtn = el("adminWagenSaveBtn");
 const adminWagenCancelBtn = el("adminWagenCancelBtn");
 const adminWagenInfo = el("adminWagenInfo");
 const adminWagenError = el("adminWagenError");
+const adminPufferPctInput = el("adminPufferPct");
+const adminPufferSaveBtn = el("adminPufferSaveBtn");
+const adminPufferInfo = el("adminPufferInfo");
+const adminPufferError = el("adminPufferError");
 
 const impressumOverlay = el("impressumOverlay");
 const impressumCloseBtn = el("impressumClose");
@@ -157,6 +170,7 @@ const openImpressumBtns = document.querySelectorAll(".open-impressum-link");
 const setupScreen = el("setup");
 const appScreen = el("app");
 const viewerScreen = el("viewer");
+const viewerArchivBanner = el("viewerArchivBanner");
 const accountRow = el("accountRow");
 const accountEmail = el("accountEmail");
 const logoutBtn = el("logoutBtn");
@@ -168,6 +182,7 @@ const standortGroup = el("standortGroup");
 const sitzplaetzeInput = el("sitzplaetze");
 const wagenGrid = el("wagenGrid");
 const wagenTotalSeatsEl = el("wagenTotalSeats");
+const wagenReserveHintEl = el("wagenReserveHint");
 const toggleSeatOverrideBtn = el("toggleSeatOverride");
 const seatOverrideField = el("seatOverrideField");
 const sitzplaetzeOverrideInput = el("sitzplaetzeOverride");
@@ -189,6 +204,7 @@ const previewViewerBtn = el("previewViewerBtn");
 const connStatus = el("connStatus");
 
 const seatsBanner = el("seatsBanner");
+const archivBanner = el("archivBanner");
 const totalTodayEl = el("totalToday");
 const seatsTotalEl = el("seatsTotal");
 const seatsFreeEl = el("seatsFree");
@@ -258,6 +274,7 @@ const viewerWarning = el("viewerWarning");
 const wagenEditOverlay = el("wagenEditOverlay");
 const wagenEditGrid = el("wagenEditGrid");
 const wagenEditTotalSeatsEl = el("wagenEditTotalSeats");
+const wagenEditReserveHintEl = el("wagenEditReserveHint");
 const toggleSeatEditOverrideBtn = el("toggleSeatEditOverride");
 const seatEditOverrideField = el("seatEditOverrideField");
 const sitzplaetzeEditOverrideInput = el("sitzplaetzeEditOverride");
@@ -324,6 +341,7 @@ function initAuthScreen() {
   adminWagenFileInput.addEventListener("change", () => {
     adminWagenFileNameEl.textContent = adminWagenFileInput.files[0]?.name || "";
   });
+  adminPufferSaveBtn.addEventListener("click", saveSitzplatzReserve);
 
   openImpressumBtns.forEach((btn) => btn.addEventListener("click", () => impressumOverlay.classList.remove("hidden")));
   impressumCloseBtn.addEventListener("click", () => impressumOverlay.classList.add("hidden"));
@@ -487,6 +505,7 @@ async function doPasswordReset() {
 
 async function doLogout() {
   try {
+    stopArchivWatch();
     if (unsubDoc) { unsubDoc(); unsubDoc = null; }
     if (unsubActivity) { unsubActivity(); unsubActivity = null; }
     if (unsubHistory) { unsubHistory(); unsubHistory = null; }
@@ -494,8 +513,9 @@ async function doLogout() {
     if (unsubAdminList) { unsubAdminList(); unsubAdminList = null; }
     if (unsubReservierungen) { unsubReservierungen(); unsubReservierungen = null; }
     if (unsubWagenKatalog) { unsubWagenKatalog(); unsubWagenKatalog = null; }
+    if (unsubEinstellungen) { unsubEinstellungen(); unsubEinstellungen = null; }
     docRef = null; currentTripData = null; session = null; currentUser = null;
-    currentReservations = []; reservedSum = 0; WAGEN = [];
+    currentReservations = []; reservedSum = 0; WAGEN = []; sitzplatzReservePct = 0;
     fullOverlay.classList.add("hidden");
     await signOut(auth);
     showOnly(roleChoiceScreen);
@@ -740,6 +760,41 @@ async function saveWagenForm() {
   }
 }
 
+// ---------------------------------------------------------
+// Globaler Sitzplatz-Puffer (in %), von Admins gepflegt
+// ---------------------------------------------------------
+function subscribeToEinstellungen() {
+  unsubEinstellungen = onSnapshot(doc(db, "einstellungen", "global"), (snap) => {
+    sitzplatzReservePct = snap.exists() ? clamp0(snap.data().sitzplatzReservePct) : 0;
+    if (adminPufferPctInput) adminPufferPctInput.value = sitzplatzReservePct;
+    // Bereits sichtbare Wagen-Summen mit dem aktuellen Puffer neu berechnen
+    updateWagenTotal();
+    if (!wagenEditOverlay.classList.contains("hidden")) updateWagenEditTotal();
+  }, () => {
+    showToast("Sitzplatz-Puffer konnte nicht geladen werden.");
+  });
+}
+
+async function saveSitzplatzReserve() {
+  adminPufferError.textContent = ""; adminPufferInfo.textContent = "";
+  const pct = parseInt(adminPufferPctInput.value, 10);
+  if (isNaN(pct) || pct < 0 || pct > 99) {
+    adminPufferError.textContent = "Bitte einen Wert zwischen 0 und 99 eingeben.";
+    return;
+  }
+  adminPufferSaveBtn.disabled = true;
+  adminPufferSaveBtn.textContent = "Speichert…";
+  try {
+    await setDoc(doc(db, "einstellungen", "global"), { sitzplatzReservePct: pct }, { merge: true });
+    adminPufferInfo.textContent = "Gespeichert.";
+  } catch (err) {
+    adminPufferError.textContent = "Fehler: " + err.message;
+  } finally {
+    adminPufferSaveBtn.disabled = false;
+    adminPufferSaveBtn.textContent = "Speichern";
+  }
+}
+
 // Wechselt vom Anmelde- bzw. Rollenwahl-Bildschirm in die Fahrtenliste.
 function enterSetupForRole(rolle) {
   showOnly(setupScreen);
@@ -764,6 +819,7 @@ function enterSetupForRole(rolle) {
 
   subscribeToExistingTrips();
   if (!unsubWagenKatalog) subscribeToWagenKatalog();
+  if (!unsubEinstellungen) subscribeToEinstellungen();
 }
 
 // ===========================================================
@@ -841,13 +897,29 @@ function toggleWagenTile(id, tile) {
   updateWagenTotal();
 }
 
+// Wendet den globalen Sitzplatz-Puffer (in %) auf eine aus Wagen berechnete
+// Summe an. Eine manuell eingetragene abweichende Gesamtzahl bleibt davon
+// unberührt (die Person hat dann bewusst einen eigenen Wert festgelegt).
+function applySitzplatzReserve(rawSum) {
+  if (!sitzplatzReservePct) return rawSum;
+  return Math.max(0, Math.floor(rawSum * (1 - sitzplatzReservePct / 100)));
+}
+
+function reserveHintText(rawSum, effektiv) {
+  if (!sitzplatzReservePct || rawSum <= 0) return "";
+  return `Wagen-Kapazität: ${rawSum} · abzüglich ${sitzplatzReservePct} % Reserve = ${effektiv} Sitzplätze`;
+}
+
 function updateWagenTotal() {
   const overrideVal = parseInt(sitzplaetzeOverrideInput.value, 10);
   let total;
   if (!seatOverrideField.classList.contains("hidden") && overrideVal > 0) {
     total = overrideVal;
+    wagenReserveHintEl.textContent = "";
   } else {
-    total = WAGEN.filter((w) => selectedWagen.has(w.id)).reduce((sum, w) => sum + w.sitzplaetze, 0);
+    const rawSum = WAGEN.filter((w) => selectedWagen.has(w.id)).reduce((sum, w) => sum + w.sitzplaetze, 0);
+    total = applySitzplatzReserve(rawSum);
+    wagenReserveHintEl.textContent = reserveHintText(rawSum, total);
   }
   wagenTotalSeatsEl.textContent = total;
   sitzplaetzeInput.value = total;
@@ -858,6 +930,7 @@ function updateWagenTotal() {
 // ---------------------------------------------------------
 function openWagenEdit() {
   if (!currentTripData) return;
+  if (!verifyNichtArchiviert()) return;
   selectedWagenEdit = new Set(Array.isArray(currentTripData.wagen) ? currentTripData.wagen : []);
   const summeAusWagen = WAGEN.filter((w) => selectedWagenEdit.has(w.id)).reduce((s, w) => s + w.sitzplaetze, 0);
   const aktuelleSitzplaetze = clamp0(currentTripData.sitzplaetze);
@@ -911,8 +984,11 @@ function updateWagenEditTotal() {
   let total;
   if (!seatEditOverrideField.classList.contains("hidden") && overrideVal > 0) {
     total = overrideVal;
+    wagenEditReserveHintEl.textContent = "";
   } else {
-    total = WAGEN.filter((w) => selectedWagenEdit.has(w.id)).reduce((sum, w) => sum + w.sitzplaetze, 0);
+    const rawSum = WAGEN.filter((w) => selectedWagenEdit.has(w.id)).reduce((sum, w) => sum + w.sitzplaetze, 0);
+    total = applySitzplatzReserve(rawSum);
+    wagenEditReserveHintEl.textContent = reserveHintText(rawSum, total);
   }
   wagenEditTotalSeatsEl.textContent = total;
   return total;
@@ -962,6 +1038,7 @@ function renderExistingTrips(snap) {
     const d = docSnap.data();
     const total = computeTotal(d);
     const seats = clamp0(d.sitzplaetze);
+    const archiviert = isFahrtArchiviert(d.fahrtag);
 
     const item = document.createElement("div");
     item.className = "trip-item";
@@ -972,7 +1049,7 @@ function renderExistingTrips(snap) {
     joinBtn.innerHTML = `
       <span class="trip-item-main">
         <span class="trip-item-date">${formatDateDE(d.fahrtag)}</span>
-        <span class="trip-item-standort">${ZUG_LABEL[d.zug] || d.zug}</span>
+        <span class="trip-item-standort">${ZUG_LABEL[d.zug] || d.zug}${archiviert ? ' · <span class="trip-item-archiv">🔒 archiviert</span>' : ""}</span>
       </span>
       <span class="trip-item-stats">${total} / ${seats} Plätze</span>
       <span class="trip-item-arrow">›</span>
@@ -980,7 +1057,7 @@ function renderExistingTrips(snap) {
     joinBtn.addEventListener("click", () => joinExistingFahrt(docSnap.id, d));
     item.appendChild(joinBtn);
 
-    if (currentUser?.rolle !== "betrachter") {
+    if (currentUser?.rolle !== "betrachter" && !archiviert) {
       const delBtn = document.createElement("button");
       delBtn.type = "button";
       delBtn.className = "trip-item-delete";
@@ -998,6 +1075,10 @@ function renderExistingTrips(snap) {
 }
 
 function confirmDeleteFahrt(docId, data) {
+  if (isFahrtArchiviert(data.fahrtag)) {
+    showToast("Archivierte Fahrten können nicht mehr gelöscht werden.");
+    return;
+  }
   const label = `${formatDateDE(data.fahrtag)} (${ZUG_LABEL[data.zug] || data.zug})`;
   openConfirm(
     `Fahrt vom ${label} wirklich löschen? Alle Zählungen dieser Fahrt gehen dabei unwiderruflich verloren.`,
@@ -1138,6 +1219,7 @@ function enterApp() {
 
   subscribeToTrip();
   subscribeToReservierungen();
+  startArchivWatch();
 }
 
 // Wechselt innerhalb derselben Fahrt kurz in die große Betrachter-Anzeige,
@@ -1152,6 +1234,7 @@ function showViewerPreview() {
   viewerZugLabel.textContent = ZUG_LABEL[session.zug] || session.zug;
   viewerStandortLabel.textContent = STANDORT_LABEL[session.standort] || session.standort;
   backToEditorBtn.classList.remove("hidden");
+  applyArchivStatus();
 }
 
 function backToEditorView() {
@@ -1159,6 +1242,53 @@ function backToEditorView() {
   displayMode = "bearbeiter";
   viewerScreen.classList.add("hidden");
   appScreen.classList.remove("hidden");
+  applyArchivStatus();
+}
+
+// ---------------------------------------------------------
+// Archivierungs-Status (Anzeige sperren, sobald der Fahrtag vorbei ist)
+// ---------------------------------------------------------
+let archivCheckInterval = null;
+
+function applyArchivStatus() {
+  if (!session) return;
+  const archiviert = isFahrtArchiviert(session.fahrtag);
+
+  archivBanner.classList.toggle("hidden", !archiviert);
+  viewerArchivBanner.classList.toggle("hidden", !archiviert);
+
+  const sperren = archiviert && session.rolle === "bearbeiter";
+  [
+    cardEinzelperson, cardFamilie, minusEinzelperson, minusFamilien, minusGruppen,
+    familieAndereAnzahl, gruppeMinus, gruppePlus, gruppeDisplay, gruppeAdd,
+    editSeatsBtn, resetDayBtn, undoLastBtn,
+    reservationNameInput, reservationAnzahlInput, reservationAddBtn
+  ].forEach((elm) => { if (elm) elm.disabled = sperren; });
+
+  renderReservationsList();
+}
+
+function startArchivWatch() {
+  applyArchivStatus();
+  if (archivCheckInterval) clearInterval(archivCheckInterval);
+  // Prüft minütlich neu, damit eine offen gelassene Fahrt automatisch kurz
+  // nach Mitternacht in den Nur-Ansicht-Modus wechselt, ganz ohne Neuladen.
+  archivCheckInterval = setInterval(applyArchivStatus, 60000);
+}
+
+function stopArchivWatch() {
+  if (archivCheckInterval) { clearInterval(archivCheckInterval); archivCheckInterval = null; }
+}
+
+// Zentrale Sperre für alle schreibenden Aktionen – zusätzlich zu den
+// Firestore-Regeln, damit sofort eine verständliche Meldung erscheint statt
+// eines rohen Berechtigungsfehlers.
+function verifyNichtArchiviert() {
+  if (session && isFahrtArchiviert(session.fahrtag)) {
+    showToast("Diese Fahrt ist bereits archiviert und kann nicht mehr bearbeitet werden.");
+    return false;
+  }
+  return true;
 }
 
 function leaveApp() {
@@ -1166,6 +1296,7 @@ function leaveApp() {
   if (unsubActivity) unsubActivity();
   if (unsubHistory) unsubHistory();
   if (unsubReservierungen) { unsubReservierungen(); unsubReservierungen = null; }
+  stopArchivWatch();
   docRef = null;
   currentTripData = null;
   currentReservations = [];
@@ -1346,6 +1477,7 @@ function renderReservationsList() {
 async function confirmReservation(resId) {
   const res = currentReservations.find((r) => r.id === resId);
   if (!res || !docRef) return;
+  if (!verifyNichtArchiviert()) return;
   try {
     await deleteDoc(doc(collection(docRef, "reservierungen"), resId));
     await addFahrgaeste("gruppen", clamp0(res.anzahl), `Reservierung: ${res.name}`);
@@ -1357,6 +1489,7 @@ async function confirmReservation(resId) {
 
 async function removeReservation(resId) {
   if (!docRef) return;
+  if (!verifyNichtArchiviert()) return;
   try {
     await deleteDoc(doc(collection(docRef, "reservierungen"), resId));
   } catch (err) {
@@ -1366,6 +1499,7 @@ async function removeReservation(resId) {
 
 async function addReservation() {
   if (!docRef) return;
+  if (!verifyNichtArchiviert()) return;
   const name = reservationNameInput.value.trim();
   const anzahl = parseInt(reservationAnzahlInput.value, 10);
   if (!name) { showToast("Bitte einen Gruppennamen eingeben."); return; }
@@ -1418,6 +1552,7 @@ function setConnStatus(state) { applyConnStatus(connStatus, state); }
 
 async function addFahrgaeste(kategorie, delta, hinweis) {
   if (!docRef || !delta) return;
+  if (!verifyNichtArchiviert()) return;
   try {
     await updateDoc(docRef, { [kategorie]: increment(delta), aktualisiert: serverTimestamp() });
     const eventData = {
@@ -1604,6 +1739,7 @@ function subscribeToActivity() {
 
 async function undoLast() {
   if (!docRef) return;
+  if (!verifyNichtArchiviert()) return;
   const q = query(collection(docRef, "ereignisse"), orderBy("zeit", "desc"), limit(1));
   const snap = await getDocs(q);
   if (snap.empty) { showToast("Keine Aktion zum Rückgängigmachen."); return; }
@@ -1683,6 +1819,7 @@ function openDoubleConfirm(text1, text2, onOk, okLabel = "Ja") {
 
 async function resetTrip() {
   if (!docRef) return;
+  if (!verifyNichtArchiviert()) return;
   try {
     await updateDoc(docRef, {
       einzelperson: 0, erwachsene: 0, kinder: 0, familien: 0, gruppen: 0, aktualisiert: serverTimestamp()
