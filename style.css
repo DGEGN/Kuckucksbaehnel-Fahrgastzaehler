@@ -730,6 +730,7 @@ html[data-theme="classic"] .panel-head {
   margin-bottom: 10px;
 }
 html[data-theme="classic"] .panel-head h2 { font-size: 1rem; color: var(--forest); }
+html[data-theme="classic"] .panel-head-actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
 html[data-theme="classic"] .panel-sub { font-size: 0.72rem; color: var(--ink-soft); }
 html[data-theme="classic"] .activity-list { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
 html[data-theme="classic"] .activity-list li {
@@ -1704,6 +1705,7 @@ html[data-theme="modern"] .panel-head {
   margin-bottom: 10px;
 }
 html[data-theme="modern"] .panel-head h2 { font-size: 1rem; color: var(--ink); }
+html[data-theme="modern"] .panel-head-actions { display: flex; gap: 14px; flex-wrap: wrap; justify-content: flex-end; }
 html[data-theme="modern"] .panel-sub { font-size: 0.72rem; color: var(--muted); }
 html[data-theme="modern"] .activity-list { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
 html[data-theme="modern"] .activity-list li {

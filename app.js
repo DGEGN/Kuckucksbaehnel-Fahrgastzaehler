@@ -224,6 +224,7 @@ const gruppeAdd = el("gruppeAdd");
 
 const activityList = el("activityList");
 const undoLastBtn = el("undoLast");
+const exportReportBtn = el("exportReportBtn");
 const historyBody = el("historyBody");
 const exportCsvBtn = el("exportCsv");
 const resetDayBtn = el("resetDay");
@@ -1347,7 +1348,7 @@ async function confirmReservation(resId) {
   if (!res || !docRef) return;
   try {
     await deleteDoc(doc(collection(docRef, "reservierungen"), resId));
-    await addFahrgaeste("gruppen", clamp0(res.anzahl));
+    await addFahrgaeste("gruppen", clamp0(res.anzahl), `Reservierung: ${res.name}`);
     showToast(`„${res.name}" bestätigt (+${res.anzahl} zur Gruppe).`);
   } catch (err) {
     showToast("Fehler: " + err.message);
@@ -1415,16 +1416,165 @@ function addNewTripReservation() {
 }
 function setConnStatus(state) { applyConnStatus(connStatus, state); }
 
-async function addFahrgaeste(kategorie, delta) {
+async function addFahrgaeste(kategorie, delta, hinweis) {
   if (!docRef || !delta) return;
   try {
     await updateDoc(docRef, { [kategorie]: increment(delta), aktualisiert: serverTimestamp() });
-    await addDoc(collection(docRef, "ereignisse"), {
+    const eventData = {
       kategorie, anzahl: delta, kasse: session.kasse, standort: session.standort, zeit: serverTimestamp()
-    });
+    };
+    if (hinweis) eventData.hinweis = hinweis;
+    await addDoc(collection(docRef, "ereignisse"), eventData);
   } catch (err) {
     showToast("Fehler beim Speichern: " + err.message);
   }
+}
+
+// ---------------------------------------------------------
+// Fahrtbericht exportieren (Statistik + komplette Live-Aktivität)
+// ---------------------------------------------------------
+async function exportFahrtBericht() {
+  if (!docRef || !currentTripData) { showToast("Keine aktive Fahrt zum Exportieren."); return; }
+  exportReportBtn.disabled = true;
+  const originalLabel = exportReportBtn.textContent;
+  exportReportBtn.textContent = "Erstelle Bericht…";
+  try {
+    const q = query(collection(docRef, "ereignisse"), orderBy("zeit", "asc"));
+    const snap = await getDocs(q);
+    const events = [];
+    snap.forEach((d) => events.push(d.data()));
+    printHtmlDocument(buildFahrtBerichtHtml(events));
+  } catch (err) {
+    showToast("Fehler beim Erstellen des Berichts: " + err.message);
+  } finally {
+    exportReportBtn.disabled = false;
+    exportReportBtn.textContent = originalLabel;
+  }
+}
+
+function buildFahrtBerichtHtml(events) {
+  const d = currentTripData;
+  const einzel = clamp0(d.einzelperson) + clamp0(d.erwachsene) + clamp0(d.kinder);
+  const fam = clamp0(d.familien), grp = clamp0(d.gruppen);
+  const total = computeTotal(d);
+  const seats = clamp0(d.sitzplaetze);
+  const reserviert = reservedSum;
+  const free = seats - total - reserviert;
+  const auslastung = seats > 0 ? Math.round(((total + reserviert) / seats) * 100) : 0;
+
+  const erstelltText = d.erstellt && typeof d.erstellt.toDate === "function"
+    ? new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(d.erstellt.toDate())
+    : "–";
+
+  const eventRows = events.map((e) => {
+    const ort = e.standort ? (STANDORT_LABEL[e.standort] || e.standort) : "–";
+    const kat = KATEGORIE_LABEL[e.kategorie] || e.kategorie;
+    const hinweisText = e.hinweis ? ` (${e.hinweis})` : "";
+    const sign = e.anzahl > 0 ? "+" : "";
+    return `<tr>
+      <td>${formatTimeDE(e.zeit)}</td>
+      <td>${escapeHtml(ort)}</td>
+      <td>${escapeHtml(e.kasse || "–")}</td>
+      <td>${escapeHtml(kat + hinweisText)}</td>
+      <td class="num">${sign}${e.anzahl}</td>
+    </tr>`;
+  }).join("");
+
+  const reservationRows = currentReservations.length
+    ? currentReservations.map((r) => `<tr><td>${escapeHtml(r.name)}</td><td class="num">${clamp0(r.anzahl)}</td></tr>`).join("")
+    : `<tr><td colspan="2" class="empty">Keine offenen Reservierungen</td></tr>`;
+
+  const erstelltBerichtText = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date());
+
+  return `<!DOCTYPE html>
+<html lang="de"><head><meta charset="UTF-8">
+<title>Fahrtbericht ${formatDateDE(d.fahrtag)} – ${ZUG_LABEL[d.zug] || d.zug}</title>
+<style>
+  * { box-sizing: border-box; }
+  body { font-family: Arial, Helvetica, sans-serif; color: #201c15; margin: 28px; }
+  h1 { color: #263c2b; font-size: 22px; margin: 0 0 2px; }
+  .sub { color: #a8532f; font-weight: bold; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 22px; }
+  h2 { color: #263c2b; font-size: 14px; border-bottom: 2px solid #263c2b; padding-bottom: 4px; margin: 26px 0 10px; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th, td { border-bottom: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+  th { background: #f2f3f6; font-size: 10px; text-transform: uppercase; letter-spacing: 0.03em; color: #555; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.empty { text-align: center; color: #888; }
+  .meta-grid { display: flex; gap: 30px; flex-wrap: wrap; margin-bottom: 4px; }
+  .meta-item { min-width: 110px; }
+  .meta-label { font-size: 10px; text-transform: uppercase; color: #888; display: block; }
+  .meta-value { font-size: 15px; font-weight: bold; }
+  .stat-grid { display: flex; gap: 14px; flex-wrap: wrap; }
+  .stat-box { border: 1px solid #ddd; border-radius: 6px; padding: 8px 14px; min-width: 90px; text-align: center; }
+  .stat-box .n { font-size: 19px; font-weight: bold; display: block; }
+  .stat-box .l { font-size: 9px; text-transform: uppercase; color: #888; letter-spacing: 0.03em; }
+  .footer { margin-top: 30px; font-size: 10px; color: #999; text-align: center; }
+  @media print {
+    body { margin: 12mm; }
+    h2 { page-break-after: avoid; }
+    tr { page-break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+  <h1>Fahrtbericht</h1>
+  <p class="sub">Fahrgastzähler · Kuckucks-Bähnel</p>
+
+  <div class="meta-grid">
+    <div class="meta-item"><span class="meta-label">Fahrtag</span><span class="meta-value">${formatDateDE(d.fahrtag)}</span></div>
+    <div class="meta-item"><span class="meta-label">Zug</span><span class="meta-value">${ZUG_LABEL[d.zug] || d.zug}</span></div>
+    <div class="meta-item"><span class="meta-label">Sitzplätze</span><span class="meta-value">${seats}</span></div>
+    <div class="meta-item"><span class="meta-label">Fahrt angelegt</span><span class="meta-value" style="font-size:12px;">${erstelltText}</span></div>
+  </div>
+
+  <h2>Statistik</h2>
+  <div class="stat-grid">
+    <div class="stat-box"><span class="n">${einzel}</span><span class="l">Einzelperson</span></div>
+    <div class="stat-box"><span class="n">${fam}</span><span class="l">Familie</span></div>
+    <div class="stat-box"><span class="n">${grp}</span><span class="l">Gruppe</span></div>
+    <div class="stat-box"><span class="n">${total}</span><span class="l">Fahrgäste gesamt</span></div>
+    <div class="stat-box"><span class="n">${reserviert}</span><span class="l">Reserviert (offen)</span></div>
+    <div class="stat-box"><span class="n">${free}</span><span class="l">Frei</span></div>
+    <div class="stat-box"><span class="n">${auslastung}%</span><span class="l">Auslastung</span></div>
+  </div>
+
+  <h2>Offene Reservierungen</h2>
+  <table>
+    <thead><tr><th>Gruppe</th><th class="num">Personen</th></tr></thead>
+    <tbody>${reservationRows}</tbody>
+  </table>
+
+  <h2>Live-Aktivität – chronologisch (${events.length} Einträge)</h2>
+  <table>
+    <thead><tr><th>Uhrzeit</th><th>Standort</th><th>Kasse</th><th>Kategorie</th><th class="num">Änderung</th></tr></thead>
+    <tbody>${eventRows || '<tr><td colspan="5" class="empty">Keine Zählungen erfasst</td></tr>'}</tbody>
+  </table>
+
+  <p class="footer">Erstellt am ${erstelltBerichtText} · Fahrgastzähler Kuckucks-Bähnel</p>
+
+  <script>
+    window.onload = function () {
+      setTimeout(function () { window.focus(); window.print(); }, 200);
+    };
+  </script>
+</body></html>`;
+}
+
+// Rendert ein HTML-Dokument in einem unsichtbaren iframe und öffnet dafür
+// den Browser-Druckdialog (dort kann als Ziel "Als PDF speichern" gewählt
+// werden) – ganz ohne zusätzliche Bibliotheken oder Pop-up-Fenster.
+function printHtmlDocument(htmlContent) {
+  const iframe = document.createElement("iframe");
+  iframe.style.cssText = "position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden;";
+  document.body.appendChild(iframe);
+  const frameDoc = iframe.contentWindow.document;
+  frameDoc.open();
+  frameDoc.write(htmlContent);
+  frameDoc.close();
+
+  const cleanup = () => { if (iframe.parentNode) iframe.remove(); };
+  iframe.contentWindow.addEventListener("afterprint", cleanup);
+  setTimeout(cleanup, 120000); // Absicherung, falls "afterprint" nicht feuert
 }
 
 function subscribeToActivity() {
@@ -1441,8 +1591,9 @@ function subscribeToActivity() {
       const sign = d.anzahl > 0 ? "+" : "";
       const deltaClass = d.anzahl > 0 ? "activity-delta-pos" : "activity-delta-neg";
       const ort = d.standort ? `${STANDORT_LABEL[d.standort] || d.standort} – ` : "";
+      const hinweis = d.hinweis ? ` · ${escapeHtml(d.hinweis)}` : "";
       li.innerHTML = `
-        <span>${ort}${escapeHtml(d.kasse || "Kasse")} · ${KATEGORIE_LABEL[d.kategorie] || d.kategorie}</span>
+        <span>${ort}${escapeHtml(d.kasse || "Kasse")} · ${KATEGORIE_LABEL[d.kategorie] || d.kategorie}${hinweis}</span>
         <span class="${deltaClass}">${sign}${d.anzahl}</span>
         <span class="activity-time">${formatTimeDE(d.zeit)}</span>
       `;
@@ -1634,6 +1785,7 @@ gruppeAdd.addEventListener("click", () => {
 });
 
 undoLastBtn.addEventListener("click", undoLast);
+exportReportBtn.addEventListener("click", exportFahrtBericht);
 resetDayBtn.addEventListener("click", () => {
   openDoubleConfirm(
     "Zählung dieser Fahrt wirklich auf 0 zurücksetzen? Die Sitzplatzanzahl bleibt erhalten.",
