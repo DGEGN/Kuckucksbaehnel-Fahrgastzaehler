@@ -18,7 +18,7 @@ import {
 // Firebase-Konsole -> Projekteinstellungen -> "Meine Apps" -> Web-App -> Konfiguration
 // Diese Werte sind KEINE Geheimnisse, Zugriffsschutz erfolgt über die
 // Firestore-Sicherheitsregeln (siehe firestore.rules / README.md).
-// ---------------------------------------------------------const firebaseConfig = {
+// ---------------------------------------------------------
 const firebaseConfig = {
   apiKey: "AIzaSyCpfHTMh8zx2hmcxjF-ayIjW0lFtJcBtSM",
   authDomain: "kuckuck-fahrkarten.firebaseapp.com",
@@ -1235,6 +1235,7 @@ function showViewerPreview() {
   viewerStandortLabel.textContent = STANDORT_LABEL[session.standort] || session.standort;
   backToEditorBtn.classList.remove("hidden");
   applyArchivStatus();
+  renderCounts();
 }
 
 function backToEditorView() {
@@ -1243,6 +1244,7 @@ function backToEditorView() {
   viewerScreen.classList.add("hidden");
   appScreen.classList.remove("hidden");
   applyArchivStatus();
+  renderCounts();
 }
 
 // ---------------------------------------------------------
@@ -1454,6 +1456,7 @@ function renderReservationsList() {
     reservationsList.innerHTML = '<li class="activity-empty">Keine Reservierungen für diese Fahrt.</li>';
     return;
   }
+  const gesperrt = session && isFahrtArchiviert(session.fahrtag);
   reservationsList.innerHTML = "";
   currentReservations.forEach((r) => {
     const li = document.createElement("li");
@@ -1461,8 +1464,8 @@ function renderReservationsList() {
     li.innerHTML = `
       <span class="reservation-name">${escapeHtml(r.name)}</span>
       <span class="reservation-anzahl">${clamp0(r.anzahl)} Pers.</span>
-      <button type="button" class="btn btn-brass btn-small" data-confirm="${r.id}">✓ Angekommen</button>
-      <button type="button" class="reservation-remove" data-remove="${r.id}" aria-label="Reservierung entfernen">✕</button>
+      <button type="button" class="btn btn-brass btn-small" data-confirm="${r.id}" ${gesperrt ? "disabled" : ""}>✓ Angekommen</button>
+      <button type="button" class="reservation-remove" data-remove="${r.id}" aria-label="Reservierung entfernen" ${gesperrt ? "disabled" : ""}>✕</button>
     `;
     reservationsList.appendChild(li);
   });
