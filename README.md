@@ -264,6 +264,7 @@ wagen/{wagenId}                       Wagen-Katalog, im Admin-Bereich gepflegt
 
 einstellungen/global                  Globale App-Einstellungen
   sitzplatzReservePct: 10              Sitzplatz-Puffer in Prozent (0-99)
+  neustadtReserveFuerLambrecht: 8      Feste Platzreserve, nur in Neustadt wirksam
 
 fahrten/{fahrtag}_{zug}                z. B. "2026-08-16_d3"
   fahrtag: "2026-08-16"
@@ -365,6 +366,36 @@ unter der Sitzplatzzahl zeigt dabei immer die Rechnung
   angewendet.
 - Der Wert liegt in Firestore unter `einstellungen/global` (Feld
   `sitzplatzReservePct`) und ist nur für Admins änderbar.
+
+## Platzreserve für Lambrecht (ab Neustadt)
+
+Direkt unter dem Sitzplatz-Puffer lässt sich im Admin-Bereich eine **feste
+Anzahl** Sitzplätze festlegen, die zusätzlich zurückgehalten wird – aber
+**nur in der Ansicht am Standort Neustadt**.
+
+Hintergrund: Da der Zug von Neustadt über Lambrecht weiterfährt, sollen
+nicht alle Plätze bereits in Neustadt verkauft werden können, sondern ein
+Teil für Fahrgäste ab Lambrecht frei bleiben.
+
+- Beispiel: 72 Sitzplätze, 8 Plätze Reserve für Lambrecht, 54 bereits
+  gezählte Fahrgäste → **in Neustadt** wird "Frei" mit 10 statt 18
+  angezeigt (72 − 54 − 8). Eine Kasse in **Lambrecht oder Elmstein** sieht
+  für dieselbe Fahrt weiterhin die vollen 18 freien Plätze – die Reserve
+  betrifft ausschließlich die Neustadt-Ansicht.
+- Die Reserve fließt in Neustadt auch in die 50 %/75 %/100 %-Warnungen
+  (siehe oben) mit ein – die Warnstufen und das Vollbesetzt-Popup können
+  dort also früher auslösen als anderswo, weil Neustadt "weniger Platz für
+  sich" rechnet.
+- Betroffen ist nur die **Anzeige** ("Frei", Warnstufen) – die tatsächliche
+  Sitzplatzzahl ("Sitzplätze") bleibt für alle Standorte gleich, ebenso wie
+  die eigentliche Fahrgastzählung selbst (die ja ohnehin standortübergreifend
+  gemeinsam geführt wird, siehe "Mehrere Kassen gleichzeitig").
+- Wie beim Sitzplatz-Puffer: der Wert gilt **global** für alle Fahrten,
+  wirkt sofort nach dem Speichern, und liegt in Firestore unter
+  `einstellungen/global` (Feld `neustadtReserveFuerLambrecht`).
+- Aktuell nur als Neustadt→Lambrecht-Regel umgesetzt (kein zusätzlicher
+  Puffer für Elmstein). Bei Bedarf lässt sich das Prinzip später auf
+  weitere Standort-Paare erweitern.
 
 ## Automatische Archivierung vergangener Fahrten
 

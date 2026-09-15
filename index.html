@@ -281,6 +281,19 @@
     <div class="admin-puffer-row">
       <input type="number" id="adminPufferPct" min="0" max="99" step="1" value="0">
       <span class="admin-puffer-percent">%</span>
+    </div>
+
+    <h2 class="trip-heading admin-reserve-heading">Platzreserve für Lambrecht (ab Neustadt)</h2>
+    <p class="trip-hint">
+      Feste Anzahl Sitzplätze, die zusätzlich zurückgehalten wird – aber nur
+      in der Ansicht am Standort Neustadt. Dort wird "Frei" entsprechend
+      kleiner angezeigt, damit für Fahrgäste ab Lambrecht Plätze frei
+      bleiben. Lambrecht, Elmstein und die Betrachter-Anzeige sind davon
+      nicht betroffen.
+    </p>
+    <div class="admin-puffer-row">
+      <input type="number" id="adminLambrechtReserve" min="0" step="1" value="0">
+      <span class="admin-puffer-percent">Plätze</span>
       <button type="button" id="adminPufferSaveBtn" class="btn btn-brass btn-small">Speichern</button>
     </div>
     <p id="adminPufferInfo" class="setup-info"></p>
@@ -557,25 +570,26 @@
     <div class="impressum-body">
       <p><strong>Angaben gemäß § 5 TMG</strong></p>
       <p>
-        DGEG Eisenbahnmuseum Neustadt/Wstr.<br>
-        Schillerstraße 3<br>
-        67434 Neustadt
+        [PLATZHALTER – Name des Betreibers / Vereins]<br>
+        [PLATZHALTER – Straße, Hausnummer]<br>
+        [PLATZHALTER – PLZ, Ort]
       </p>
       <p>
         <strong>Vertreten durch:</strong><br>
-        Pascal Leon Schneider
+        [PLATZHALTER – Vertretungsberechtigte Person(en)]
       </p>
       <p>
         <strong>Kontakt:</strong><br>
-        Telefon: +49151 59420008<br>
-        E-Mail: pascal.leon.schneider@eisenbahnmuseum-neustadt.de
+        Telefon: [PLATZHALTER]<br>
+        E-Mail: [PLATZHALTER]
       </p>
       <p>
-        <strong></strong><br>
-        
+        <strong>Registereintrag:</strong><br>
+        [PLATZHALTER – z. B. Vereinsregister, Registergericht, Registernummer, falls zutreffend]
       </p>
       <p class="impressum-hint">
-        Nur für den Internen Gebrauch
+        Dieses Impressum ist ein Platzhalter und muss noch mit den echten
+        Angaben des Betreibers ausgefüllt werden.
       </p>
     </div>
     <div class="dialog-actions">
@@ -583,7 +597,6 @@
     </div>
   </div>
 </div>
-
 
 <!-- Vollbesetzt-Warnung -->
 <div id="fullOverlay" class="dialog-overlay hidden">

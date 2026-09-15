@@ -103,7 +103,9 @@ service cloud.firestore {
       allow create, update: if istAdmin()
         && request.resource.data.sitzplatzReservePct is int
         && request.resource.data.sitzplatzReservePct >= 0
-        && request.resource.data.sitzplatzReservePct <= 99;
+        && request.resource.data.sitzplatzReservePct <= 99
+        && request.resource.data.neustadtReserveFuerLambrecht is int
+        && request.resource.data.neustadtReserveFuerLambrecht >= 0;
 
       allow delete: if false;
     }

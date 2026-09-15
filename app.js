@@ -20,13 +20,12 @@ import {
 // Firestore-Sicherheitsregeln (siehe firestore.rules / README.md).
 // ---------------------------------------------------------
 const firebaseConfig = {
-  apiKey: "AIzaSyCpfHTMh8zx2hmcxjF-ayIjW0lFtJcBtSM",
-  authDomain: "kuckuck-fahrkarten.firebaseapp.com",
-  databaseURL: "https://kuckuck-fahrkarten-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "kuckuck-fahrkarten",
-  storageBucket: "kuckuck-fahrkarten.firebasestorage.app",
-  messagingSenderId: "732559401683",
-  appId: "1:732559401683:web:dbfb8ef56c85c73de46a26"
+  apiKey: "DEIN_API_KEY",
+  authDomain: "DEIN_PROJEKT.firebaseapp.com",
+  projectId: "DEIN_PROJEKT",
+  storageBucket: "DEIN_PROJEKT.appspot.com",
+  messagingSenderId: "DEINE_SENDER_ID",
+  appId: "DEINE_APP_ID"
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -106,6 +105,7 @@ function clamp0(n) { return Math.max(0, n || 0); }
 let WAGEN = [];
 let unsubWagenKatalog = null;
 let sitzplatzReservePct = 0; // globaler Sitzplatz-Puffer in Prozent (0-99), von Admins gepflegt
+let neustadtReserveFuerLambrecht = 0; // feste Platzanzahl, die in Neustadt für Lambrecht freigehalten wird
 let unsubEinstellungen = null;
 let editingWagenId = null; // null = Neuanlage im Admin-Bereich, sonst Bearbeiten-Modus
 let selectedWagen = new Set();
@@ -157,6 +157,7 @@ const adminWagenCancelBtn = el("adminWagenCancelBtn");
 const adminWagenInfo = el("adminWagenInfo");
 const adminWagenError = el("adminWagenError");
 const adminPufferPctInput = el("adminPufferPct");
+const adminLambrechtReserveInput = el("adminLambrechtReserve");
 const adminPufferSaveBtn = el("adminPufferSaveBtn");
 const adminPufferInfo = el("adminPufferInfo");
 const adminPufferError = el("adminPufferError");
@@ -515,7 +516,7 @@ async function doLogout() {
     if (unsubWagenKatalog) { unsubWagenKatalog(); unsubWagenKatalog = null; }
     if (unsubEinstellungen) { unsubEinstellungen(); unsubEinstellungen = null; }
     docRef = null; currentTripData = null; session = null; currentUser = null;
-    currentReservations = []; reservedSum = 0; WAGEN = []; sitzplatzReservePct = 0;
+    currentReservations = []; reservedSum = 0; WAGEN = []; sitzplatzReservePct = 0; neustadtReserveFuerLambrecht = 0;
     fullOverlay.classList.add("hidden");
     await signOut(auth);
     showOnly(roleChoiceScreen);
@@ -761,15 +762,19 @@ async function saveWagenForm() {
 }
 
 // ---------------------------------------------------------
-// Globaler Sitzplatz-Puffer (in %), von Admins gepflegt
+// Globaler Sitzplatz-Puffer (in %) und Standort-Reserve, von Admins gepflegt
 // ---------------------------------------------------------
 function subscribeToEinstellungen() {
   unsubEinstellungen = onSnapshot(doc(db, "einstellungen", "global"), (snap) => {
-    sitzplatzReservePct = snap.exists() ? clamp0(snap.data().sitzplatzReservePct) : 0;
+    const data = snap.exists() ? snap.data() : {};
+    sitzplatzReservePct = clamp0(data.sitzplatzReservePct);
+    neustadtReserveFuerLambrecht = clamp0(data.neustadtReserveFuerLambrecht);
     if (adminPufferPctInput) adminPufferPctInput.value = sitzplatzReservePct;
+    if (adminLambrechtReserveInput) adminLambrechtReserveInput.value = neustadtReserveFuerLambrecht;
     // Bereits sichtbare Wagen-Summen mit dem aktuellen Puffer neu berechnen
     updateWagenTotal();
     if (!wagenEditOverlay.classList.contains("hidden")) updateWagenEditTotal();
+    renderCounts();
   }, () => {
     showToast("Sitzplatz-Puffer konnte nicht geladen werden.");
   });
@@ -778,14 +783,22 @@ function subscribeToEinstellungen() {
 async function saveSitzplatzReserve() {
   adminPufferError.textContent = ""; adminPufferInfo.textContent = "";
   const pct = parseInt(adminPufferPctInput.value, 10);
+  const lambrechtReserve = parseInt(adminLambrechtReserveInput.value, 10) || 0;
   if (isNaN(pct) || pct < 0 || pct > 99) {
-    adminPufferError.textContent = "Bitte einen Wert zwischen 0 und 99 eingeben.";
+    adminPufferError.textContent = "Bitte beim Sitzplatz-Puffer einen Wert zwischen 0 und 99 eingeben.";
+    return;
+  }
+  if (lambrechtReserve < 0) {
+    adminPufferError.textContent = "Die Platzreserve für Lambrecht darf nicht negativ sein.";
     return;
   }
   adminPufferSaveBtn.disabled = true;
   adminPufferSaveBtn.textContent = "Speichert…";
   try {
-    await setDoc(doc(db, "einstellungen", "global"), { sitzplatzReservePct: pct }, { merge: true });
+    await setDoc(doc(db, "einstellungen", "global"), {
+      sitzplatzReservePct: pct,
+      neustadtReserveFuerLambrecht: lambrechtReserve
+    }, { merge: true });
     adminPufferInfo.textContent = "Gespeichert.";
   } catch (err) {
     adminPufferError.textContent = "Fehler: " + err.message;
@@ -1396,9 +1409,13 @@ function renderCounts() {
   const total = computeTotal(d);
   const seats = clamp0(d.sitzplaetze);
   const reserviert = reservedSum;
+  // Nur in Neustadt wird zusätzlich die für Lambrecht eingerichtete
+  // Platzreserve von "frei" abgezogen – Lambrecht/Elmstein und Betrachter an
+  // anderen Standorten sehen davon nichts (bewusst so gewählt).
+  const standortReserve = session?.standort === "neustadt" ? clamp0(neustadtReserveFuerLambrecht) : 0;
   // Reservierte Plätze gelten als "schon vergeben", auch bevor die Gruppe da ist.
-  const free = seats - total - reserviert;
-  const pct = seats > 0 ? (total + reserviert) / seats : 0;
+  const free = seats - total - reserviert - standortReserve;
+  const pct = seats > 0 ? (total + reserviert + standortReserve) / seats : 0;
   const info = warningLevelInfo(pct, free);
 
   if (info.level === "100" && lastWarnLevel !== "100") {

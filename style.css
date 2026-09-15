@@ -340,6 +340,7 @@ html[data-theme="classic"] .admin-puffer-row input {
 }
 html[data-theme="classic"] .admin-puffer-row input:focus { outline: 2px solid var(--brass); outline-offset: 1px; }
 html[data-theme="classic"] .admin-puffer-percent { font-weight: 600; color: var(--ink-soft); margin-right: auto; }
+html[data-theme="classic"] .admin-reserve-heading { margin-top: 18px; }
 html[data-theme="classic"] .impressum-card { max-width: 460px; text-align: left; }
 html[data-theme="classic"] .impressum-title { color: var(--forest); margin-bottom: 14px; text-align: center; }
 html[data-theme="classic"] .impressum-body { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.5; max-height: 50vh; overflow-y: auto; }
@@ -1336,6 +1337,7 @@ html[data-theme="modern"] .admin-puffer-row input {
 }
 html[data-theme="modern"] .admin-puffer-row input:focus { outline: 2px solid var(--rail-blue); outline-offset: 1px; }
 html[data-theme="modern"] .admin-puffer-percent { font-weight: 600; color: var(--ink-soft); margin-right: auto; }
+html[data-theme="modern"] .admin-reserve-heading { margin-top: 18px; }
 html[data-theme="modern"] .impressum-card { max-width: 460px; text-align: left; }
 html[data-theme="modern"] .impressum-title { color: var(--ink); margin-bottom: 14px; text-align: center; }
 html[data-theme="modern"] .impressum-body { font-size: 0.85rem; color: var(--ink-soft); line-height: 1.5; max-height: 50vh; overflow-y: auto; }
