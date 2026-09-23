@@ -17,7 +17,7 @@ import {
 // TODO: Hier deine eigene Firebase-Projektkonfiguration eintragen.
 // Firebase-Konsole -> Projekteinstellungen -> "Meine Apps" -> Web-App -> Konfiguration
 // Diese Werte sind KEINE Geheimnisse, Zugriffsschutz erfolgt über die
-// Firestore-Sicherheitsregeln (siehe firestore.rules / README.md).
+// Firestore-Sicherheitsregeln (siehe firestore.rules / README.md)
 // ---------------------------------------------------------
 const firebaseConfig = {
   apiKey: "AIzaSyCpfHTMh8zx2hmcxjF-ayIjW0lFtJcBtSM",
