@@ -20,13 +20,12 @@ import {
 // Firestore-Sicherheitsregeln (siehe firestore.rules / README.md).
 // ---------------------------------------------------------
 const firebaseConfig = {
-  apiKey: "AIzaSyCpfHTMh8zx2hmcxjF-ayIjW0lFtJcBtSM",
-  authDomain: "kuckuck-fahrkarten.firebaseapp.com",
-  databaseURL: "https://kuckuck-fahrkarten-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "kuckuck-fahrkarten",
-  storageBucket: "kuckuck-fahrkarten.firebasestorage.app",
-  messagingSenderId: "732559401683",
-  appId: "1:732559401683:web:dbfb8ef56c85c73de46a26"
+  apiKey: "DEIN_API_KEY",
+  authDomain: "DEIN_PROJEKT.firebaseapp.com",
+  projectId: "DEIN_PROJEKT",
+  storageBucket: "DEIN_PROJEKT.appspot.com",
+  messagingSenderId: "DEINE_SENDER_ID",
+  appId: "DEINE_APP_ID"
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -153,6 +152,7 @@ const adminWagenNameInput = el("adminWagenName");
 const adminWagenSitzplaetzeInput = el("adminWagenSitzplaetze");
 const adminWagenFileInput = el("adminWagenBild");
 const adminWagenFileNameEl = el("adminWagenFileName");
+const adminWagenPufferInput = el("adminWagenPuffer");
 const adminWagenSaveBtn = el("adminWagenSaveBtn");
 const adminWagenCancelBtn = el("adminWagenCancelBtn");
 const adminWagenInfo = el("adminWagenInfo");
@@ -630,6 +630,7 @@ function renderAdminWagenList() {
   }
   adminWagenList.innerHTML = "";
   WAGEN.forEach((w) => {
+    const pufferAn = w.pufferAnwenden !== false;
     const item = document.createElement("div");
     item.className = "admin-wagen-item";
     item.innerHTML = `
@@ -637,6 +638,7 @@ function renderAdminWagenList() {
       <div class="admin-wagen-meta">
         <span class="admin-wagen-name">${escapeHtml(w.name)}</span>
         <span class="admin-wagen-seats">${clamp0(w.sitzplaetze)} Plätze</span>
+        <span class="admin-wagen-puffer-badge ${pufferAn ? "" : "aus"}">${pufferAn ? "Puffer aktiv" : "Ohne Puffer"}</span>
       </div>
       <button type="button" class="btn btn-ghost btn-small" data-edit-wagen="${w.id}">✏️</button>
       <button type="button" class="btn btn-danger-outline btn-small" data-delete-wagen="${w.id}">🗑</button>
@@ -659,6 +661,7 @@ function startEditWagen(wagenId) {
   adminWagenSitzplaetzeInput.value = w.sitzplaetze;
   adminWagenFileInput.value = "";
   adminWagenFileNameEl.textContent = "Bild unverändert lassen oder neues Bild wählen";
+  adminWagenPufferInput.checked = w.pufferAnwenden !== false;
   adminWagenSaveBtn.textContent = "Änderungen speichern";
   adminWagenCancelBtn.classList.remove("hidden");
   adminWagenError.textContent = ""; adminWagenInfo.textContent = "";
@@ -671,6 +674,7 @@ function cancelEditWagen() {
   adminWagenSitzplaetzeInput.value = "";
   adminWagenFileInput.value = "";
   adminWagenFileNameEl.textContent = "";
+  adminWagenPufferInput.checked = true;
   adminWagenSaveBtn.textContent = "+ Wagen hinzufügen";
   adminWagenCancelBtn.classList.add("hidden");
   adminWagenError.textContent = ""; adminWagenInfo.textContent = "";
@@ -732,6 +736,7 @@ async function saveWagenForm() {
   const name = adminWagenNameInput.value.trim();
   const sitzplaetze = parseInt(adminWagenSitzplaetzeInput.value, 10);
   const file = adminWagenFileInput.files[0] || null;
+  const pufferAnwenden = adminWagenPufferInput.checked;
 
   if (!name) { adminWagenError.textContent = "Bitte einen Namen eingeben."; return; }
   if (!sitzplaetze || sitzplaetze < 1) { adminWagenError.textContent = "Bitte eine gültige Sitzplatzzahl eingeben."; return; }
@@ -745,12 +750,12 @@ async function saveWagenForm() {
     if (file) bild = await getCompressedWagenImage(file);
 
     if (wasEditing) {
-      const updateData = { name, sitzplaetze };
+      const updateData = { name, sitzplaetze, pufferAnwenden };
       if (bild) updateData.bild = bild;
       await updateDoc(doc(db, "wagen", editingWagenId), updateData);
       showToast("Wagen aktualisiert.");
     } else {
-      await addDoc(collection(db, "wagen"), { name, sitzplaetze, bild, erstellt: serverTimestamp() });
+      await addDoc(collection(db, "wagen"), { name, sitzplaetze, bild, pufferAnwenden, erstellt: serverTimestamp() });
       showToast("Wagen hinzugefügt.");
     }
     cancelEditWagen();
@@ -914,14 +919,20 @@ function toggleWagenTile(id, tile) {
 // Wendet den globalen Sitzplatz-Puffer (in %) auf eine aus Wagen berechnete
 // Summe an. Eine manuell eingetragene abweichende Gesamtzahl bleibt davon
 // unberührt (die Person hat dann bewusst einen eigenen Wert festgelegt).
-function applySitzplatzReserve(rawSum) {
-  if (!sitzplatzReservePct) return rawSum;
-  return Math.max(0, Math.floor(rawSum * (1 - sitzplatzReservePct / 100)));
+// Effektive Sitzplätze eines einzelnen Wagens: Der Puffer greift nur, wenn
+// er beim Wagen im Admin-Bereich aktiviert wurde (Feld "pufferAnwenden").
+function wagenEffectiveSeats(w) {
+  const roh = clamp0(w.sitzplaetze);
+  if (!sitzplatzReservePct || w.pufferAnwenden === false) return roh;
+  return Math.max(0, Math.floor(roh * (1 - sitzplatzReservePct / 100)));
 }
 
-function reserveHintText(rawSum, effektiv) {
-  if (!sitzplatzReservePct || rawSum <= 0) return "";
-  return `Wagen-Kapazität: ${rawSum} · abzüglich ${sitzplatzReservePct} % Reserve = ${effektiv} Sitzplätze`;
+function reserveHintText(rawSum, effektiv, betroffeneAnzahl, gesamtAnzahl) {
+  if (!sitzplatzReservePct || rawSum <= 0 || betroffeneAnzahl === 0) return "";
+  const wagenText = betroffeneAnzahl === gesamtAnzahl
+    ? `bei allen ${gesamtAnzahl} ausgewählten Wagen`
+    : `bei ${betroffeneAnzahl} von ${gesamtAnzahl} ausgewählten Wagen`;
+  return `Wagen-Kapazität: ${rawSum} · ${sitzplatzReservePct} % Reserve ${wagenText} = ${effektiv} Sitzplätze`;
 }
 
 function updateWagenTotal() {
@@ -931,9 +942,11 @@ function updateWagenTotal() {
     total = overrideVal;
     wagenReserveHintEl.textContent = "";
   } else {
-    const rawSum = WAGEN.filter((w) => selectedWagen.has(w.id)).reduce((sum, w) => sum + w.sitzplaetze, 0);
-    total = applySitzplatzReserve(rawSum);
-    wagenReserveHintEl.textContent = reserveHintText(rawSum, total);
+    const selected = WAGEN.filter((w) => selectedWagen.has(w.id));
+    const rawSum = selected.reduce((sum, w) => sum + clamp0(w.sitzplaetze), 0);
+    const betroffeneAnzahl = selected.filter((w) => w.pufferAnwenden !== false).length;
+    total = selected.reduce((sum, w) => sum + wagenEffectiveSeats(w), 0);
+    wagenReserveHintEl.textContent = reserveHintText(rawSum, total, betroffeneAnzahl, selected.length);
   }
   wagenTotalSeatsEl.textContent = total;
   sitzplaetzeInput.value = total;
@@ -1000,9 +1013,11 @@ function updateWagenEditTotal() {
     total = overrideVal;
     wagenEditReserveHintEl.textContent = "";
   } else {
-    const rawSum = WAGEN.filter((w) => selectedWagenEdit.has(w.id)).reduce((sum, w) => sum + w.sitzplaetze, 0);
-    total = applySitzplatzReserve(rawSum);
-    wagenEditReserveHintEl.textContent = reserveHintText(rawSum, total);
+    const selected = WAGEN.filter((w) => selectedWagenEdit.has(w.id));
+    const rawSum = selected.reduce((sum, w) => sum + clamp0(w.sitzplaetze), 0);
+    const betroffeneAnzahl = selected.filter((w) => w.pufferAnwenden !== false).length;
+    total = selected.reduce((sum, w) => sum + wagenEffectiveSeats(w), 0);
+    wagenEditReserveHintEl.textContent = reserveHintText(rawSum, total, betroffeneAnzahl, selected.length);
   }
   wagenEditTotalSeatsEl.textContent = total;
   return total;

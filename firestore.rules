@@ -83,11 +83,12 @@ service cloud.firestore {
       allow read: if request.auth != null;
 
       allow create: if istAdmin()
-        && request.resource.data.keys().hasAll(['name', 'sitzplaetze', 'bild'])
+        && request.resource.data.keys().hasAll(['name', 'sitzplaetze', 'bild', 'pufferAnwenden'])
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
         && request.resource.data.sitzplaetze is int
-        && request.resource.data.sitzplaetze > 0;
+        && request.resource.data.sitzplaetze > 0
+        && request.resource.data.pufferAnwenden is bool;
 
       allow update: if istAdmin();
       allow delete: if istAdmin();

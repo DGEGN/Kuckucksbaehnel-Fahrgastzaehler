@@ -260,6 +260,7 @@ wagen/{wagenId}                       Wagen-Katalog, im Admin-Bereich gepflegt
   name: "Wagen 5"
   sitzplaetze: 32
   bild: "data:image/jpeg;base64,...."  Komprimiertes Foto (siehe unten)
+  pufferAnwenden: true                 Sitzplatz-Puffer bei diesem Wagen? (Standard: true)
   erstellt: Timestamp
 
 einstellungen/global                  Globale App-Einstellungen
@@ -351,19 +352,30 @@ Reserve von der Wagen-Kapazität zurückgehalten wird. Beispiel: 4 Wagen mit
 zusammen 80 Sitzplätzen und 10 % Puffer → die App schlägt beim Anlegen
 bzw. nachträglichen Bearbeiten einer Fahrt automatisch **72** Sitzplätze
 vor (10 % = 8 Plätze werden als Reserve nicht angeboten). Der Hinweistext
-unter der Sitzplatzzahl zeigt dabei immer die Rechnung
-("Wagen-Kapazität: 80 · abzüglich 10 % Reserve = 72 Sitzplätze").
+unter der Sitzplatzzahl zeigt dabei immer die Rechnung, z. B.
+("Wagen-Kapazität: 80 · 10 % Reserve bei 3 von 4 ausgewählten Wagen = 74
+Sitzplätze").
 
-- Der Puffer gilt **global** für alle Fahrten und wird sofort wirksam,
-  sobald er gespeichert wird.
+- Der Puffer gilt **nur bei den Wagen, bei denen er aktiviert ist**. Beim
+  Anlegen oder Bearbeiten eines Wagens im Admin-Bereich lässt sich über die
+  Checkbox **"Sitzplatz-Puffer bei diesem Wagen anwenden"** festlegen, ob
+  der Prozentsatz bei diesem Wagen abgezogen wird (Standard: aktiviert).
+  Ein Wagen ohne Häkchen zählt immer mit voller Sitzplatzzahl, egal wie
+  hoch der Prozentsatz ist – praktisch z. B. für einen kleinen
+  Aussichtswagen, bei dem jeder Platz zählen soll. In der Wagen-Liste im
+  Admin-Bereich zeigt ein Badge ("Puffer aktiv" / "Ohne Puffer") den
+  aktuellen Status jedes Wagens.
+- Der Prozentsatz selbst gilt weiterhin **global** für alle Fahrten und
+  wird sofort wirksam, sobald er gespeichert wird – gesteuert wird nur,
+  *bei welchen Wagen* er überhaupt angewendet wird.
 - Er wirkt sich **nur auf die automatische Berechnung aus den Wagen aus**.
   Wird stattdessen "abweichende Gesamtzahl…" genutzt, um die Sitzplatzzahl
   manuell einzutragen, greift der Puffer nicht – der manuell eingetragene
   Wert wird unverändert übernommen.
 - Bereits angelegte Fahrten ändern sich durch eine spätere Anpassung des
-  Prozentsatzes **nicht automatisch** – nur bei der (nachträglichen)
-  Neuberechnung aus der Wagen-Auswahl wird der dann aktuelle Prozentsatz
-  angewendet.
+  Prozentsatzes oder der Wagen-Einstellung **nicht automatisch** – nur bei
+  der (nachträglichen) Neuberechnung aus der Wagen-Auswahl wird der dann
+  aktuelle Stand angewendet.
 - Der Wert liegt in Firestore unter `einstellungen/global` (Feld
   `sitzplatzReservePct`) und ist nur für Admins änderbar.
 

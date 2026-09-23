@@ -310,6 +310,21 @@ html[data-theme="classic"] .admin-wagen-thumb { width: 56px; height: 42px; objec
 html[data-theme="classic"] .admin-wagen-meta { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 html[data-theme="classic"] .admin-wagen-name { font-weight: 600; font-size: 0.88rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html[data-theme="classic"] .admin-wagen-seats { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-soft); }
+html[data-theme="classic"] .admin-wagen-puffer-badge {
+  align-self: flex-start;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-top: 2px;
+  background: var(--ok, #3c6b47);
+  color: #fff;
+}
+html[data-theme="classic"] .admin-wagen-puffer-badge.aus { background: var(--paper-dark); color: var(--ink-soft); }
+html[data-theme="classic"] .admin-wagen-checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; font-weight: 600; color: var(--ink); cursor: pointer; }
+html[data-theme="classic"] .admin-wagen-checkbox-label input { width: 16px; height: 16px; }
 html[data-theme="classic"] .admin-wagen-form { text-align: left; background: var(--paper); border-radius: 10px; padding: 14px; margin-bottom: 8px; }
 html[data-theme="classic"] .admin-wagen-file-label {
   display: inline-block;
@@ -1307,6 +1322,21 @@ html[data-theme="modern"] .admin-wagen-thumb { width: 56px; height: 42px; object
 html[data-theme="modern"] .admin-wagen-meta { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 html[data-theme="modern"] .admin-wagen-name { font-weight: 600; font-size: 0.88rem; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 html[data-theme="modern"] .admin-wagen-seats { font-family: var(--font-mono); font-size: 0.78rem; color: var(--ink-soft); }
+html[data-theme="modern"] .admin-wagen-puffer-badge {
+  align-self: flex-start;
+  font-size: 0.66rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-top: 2px;
+  background: var(--signal-green, #1f8b4c);
+  color: #fff;
+}
+html[data-theme="modern"] .admin-wagen-puffer-badge.aus { background: var(--border-strong); color: var(--ink-soft); }
+html[data-theme="modern"] .admin-wagen-checkbox-label { display: flex; align-items: center; gap: 8px; font-size: 0.88rem; font-weight: 600; color: var(--ink); cursor: pointer; }
+html[data-theme="modern"] .admin-wagen-checkbox-label input { width: 16px; height: 16px; }
 html[data-theme="modern"] .admin-wagen-form { text-align: left; background: var(--paper); border-radius: 14px; padding: 14px; margin-bottom: 8px; }
 html[data-theme="modern"] .admin-wagen-file-label {
   display: inline-block;
