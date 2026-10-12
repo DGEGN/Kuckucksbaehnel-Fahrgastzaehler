@@ -212,7 +212,8 @@
         </ul>
         <div class="reservation-add-row">
           <input type="text" id="newTripResName" placeholder="Gruppenname" maxlength="40">
-          <input type="number" id="newTripResAnzahl" placeholder="Anzahl" min="1" step="1" inputmode="numeric">
+          <input type="number" id="newTripResAnzahl" placeholder="Erwachsene" min="0" step="1" inputmode="numeric">
+          <input type="number" id="newTripResKinder" placeholder="Kinder" min="0" step="1" inputmode="numeric">
           <button type="button" id="newTripResAdd" class="btn btn-ghost btn-small">+ Hinzufügen</button>
         </div>
       </div>
@@ -395,7 +396,8 @@
     </ul>
     <div class="reservation-add-row">
       <input type="text" id="reservationName" placeholder="Gruppenname" maxlength="40">
-      <input type="number" id="reservationAnzahl" placeholder="Anzahl" min="1" step="1" inputmode="numeric">
+      <input type="number" id="reservationAnzahl" placeholder="Erwachsene" min="0" step="1" inputmode="numeric">
+      <input type="number" id="reservationKinder" placeholder="Kinder" min="0" step="1" inputmode="numeric">
       <button type="button" id="reservationAdd" class="btn btn-brass btn-small">+ Hinzufügen</button>
     </div>
   </section>
@@ -584,7 +586,8 @@
     <p>Reservierte Gruppe bearbeiten</p>
     <div class="res-edit-fields">
       <input type="text" id="resEditName" placeholder="Gruppenname" maxlength="40">
-      <input type="number" id="resEditAnzahl" placeholder="Anzahl" min="1" step="1" inputmode="numeric">
+      <input type="number" id="resEditAnzahl" placeholder="Erwachsene" min="0" step="1" inputmode="numeric">
+      <input type="number" id="resEditKinder" placeholder="Kinder" min="0" step="1" inputmode="numeric">
     </div>
     <div class="dialog-actions">
       <button type="button" id="resEditCancel" class="btn btn-ghost">Abbrechen</button>

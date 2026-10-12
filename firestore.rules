@@ -167,7 +167,7 @@ service cloud.firestore {
         // Bearbeiten (Name / abweichende Personenzahl) – nur diese beiden Felder
         allow update: if istBearbeiter()
           && !istFahrtArchiviert(fahrtId)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'anzahl'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'anzahl', 'erwachsene', 'kinder'])
           && request.resource.data.name is string
           && request.resource.data.name.size() > 0
           && request.resource.data.anzahl is int

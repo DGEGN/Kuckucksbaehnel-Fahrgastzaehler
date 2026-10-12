@@ -72,7 +72,7 @@ direkt im Browser (HTML/CSS/JS), Daten liegen in Firebase Firestore und werden
   Betrachter-Ansicht) – erst wenn die Fahrt danach wieder unter 100 % fällt
   und erneut 100 % erreicht, löst die Warnung erneut aus.
 - **Vorreservierte Gruppen** (mit ✏️ jederzeit bearbeitbar – Name und
-  abweichende Personenzahl; bei „Angekommen“ wird der Name als `gruppenName`
+  abweichende Personenzahl; Aufteilung in **Erwachsene und Kinder**; bei „Angekommen“ wird der Name als `gruppenName`
   im Ereignis gespeichert und erscheint im Fahrtbericht in der Tabelle
   „Gruppen (angekommen)“): Beim Anlegen einer neuen Fahrt (oder jederzeit
   danach im Panel **"Reservierte Gruppen"**) lässt sich für angemeldete
@@ -288,10 +288,13 @@ fahrten/{fahrtId}/ereignisse/{eventId}   Live-Protokoll je Zählung
   zeit: Timestamp
   hinweis: "Reservierung: <Name>"   (optional)
   gruppenName: "<Name>"            (optional, bei bestätigten Reservierungen)
+  erwachsene, kinder: <Zahl>        (optional, Aufteilung der Gruppe – Grundlage für Preisberechnung)
 
 fahrten/{fahrtId}/reservierungen/{resId}   Vorreservierte Gruppen
   name: "Schulklasse Musterstadt"
-  anzahl: 10
+  anzahl: 10            (= erwachsene + kinder)
+  erwachsene: 8
+  kinder: 2
   erstellt: Timestamp
 ```
 

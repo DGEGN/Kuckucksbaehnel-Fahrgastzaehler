@@ -28,6 +28,7 @@ const firebaseConfig = {
   messagingSenderId: "732559401683",
   appId: "1:732559401683:web:dbfb8ef56c85c73de46a26"
 };
+
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
@@ -227,6 +228,9 @@ const resEditCancelBtn = el("resEditCancel");
 let resEditTarget = null; // { type: "live", id } | { type: "new", index }
 const newTripResNameInput = el("newTripResName");
 const newTripResAnzahlInput = el("newTripResAnzahl");
+const newTripResKinderInput = el("newTripResKinder");
+const reservationKinderInput = el("reservationKinder");
+const resEditKinderInput = el("resEditKinder");
 const newTripResAddBtn = el("newTripResAdd");
 const viewerReservedEl = el("viewerReserved");
 
@@ -1208,7 +1212,7 @@ async function startSession() {
 
     if (pendingNewTripReservations.length) {
       await Promise.all(pendingNewTripReservations.map((r) =>
-        addDoc(collection(ref, "reservierungen"), { name: r.name, anzahl: r.anzahl, erstellt: serverTimestamp() })
+        addDoc(collection(ref, "reservierungen"), { name: r.name, anzahl: r.anzahl, erwachsene: r.erwachsene, kinder: r.kinder, erstellt: serverTimestamp() })
       ));
       pendingNewTripReservations = [];
       renderNewTripReservations();
@@ -1301,7 +1305,7 @@ function applyArchivStatus() {
     cardEinzelperson, cardFamilie, minusEinzelperson, minusFamilien, minusGruppen,
     familieAndereAnzahl, gruppeMinus, gruppePlus, gruppeDisplay, gruppeAdd,
     editSeatsBtn, resetDayBtn, undoLastBtn,
-    reservationNameInput, reservationAnzahlInput, reservationAddBtn
+    reservationNameInput, reservationAnzahlInput, reservationKinderInput, reservationAddBtn
   ].forEach((elm) => { if (elm) elm.disabled = sperren; });
 
   renderReservationsList();
@@ -1504,7 +1508,7 @@ function renderReservationsList() {
     li.className = "reservation-item";
     li.innerHTML = `
       <span class="reservation-name">${escapeHtml(r.name)}</span>
-      <span class="reservation-anzahl">${clamp0(r.anzahl)} Pers.</span>
+      <span class="reservation-anzahl">${resLabel(r)}</span>
       <button type="button" class="reservation-edit" data-edit="${r.id}" aria-label="Reservierung bearbeiten" ${gesperrt ? "disabled" : ""}>✏️</button>
       <button type="button" class="btn btn-brass btn-small" data-confirm="${r.id}" ${gesperrt ? "disabled" : ""}>✓ Angekommen</button>
       <button type="button" class="reservation-remove" data-remove="${r.id}" aria-label="Reservierung entfernen" ${gesperrt ? "disabled" : ""}>✕</button>
@@ -1528,7 +1532,7 @@ async function confirmReservation(resId) {
   if (!verifyNichtArchiviert()) return;
   try {
     await deleteDoc(doc(collection(docRef, "reservierungen"), resId));
-    await addFahrgaeste("gruppen", clamp0(res.anzahl), `Reservierung: ${res.name}`, res.name);
+    await addFahrgaeste("gruppen", clamp0(res.anzahl), `Reservierung: ${res.name}`, res.name, { erwachsene: resErw(res), kinder: resKin(res) });
     showToast(`„${res.name}" bestätigt (+${res.anzahl} zur Gruppe).`);
   } catch (err) {
     showToast("Fehler: " + err.message);
@@ -1545,17 +1549,35 @@ async function removeReservation(resId) {
   }
 }
 
+// Liest Erwachsene/Kinder aus zwei Feldern; null bei ungültiger Eingabe
+function readGroupSplit(erwInput, kinInput) {
+  const erwachsene = parseInt(erwInput.value, 10) || 0;
+  const kinder = parseInt(kinInput.value, 10) || 0;
+  if (erwachsene < 0 || kinder < 0 || erwachsene + kinder < 1) {
+    showToast("Bitte Erwachsene und/oder Kinder (mind. 1 Person) eingeben.");
+    return null;
+  }
+  return { erwachsene, kinder, anzahl: erwachsene + kinder };
+}
+// Ältere Reservierungen ohne Aufteilung: alle als Erwachsene darstellen
+function resErw(r) { return r.erwachsene !== undefined ? clamp0(r.erwachsene) : clamp0(r.anzahl); }
+function resKin(r) { return clamp0(r.kinder); }
+function resLabel(r) {
+  return `${clamp0(r.anzahl)} Pers. (${resErw(r)} Erw. / ${resKin(r)} Kinder)`;
+}
+
 async function addReservation() {
   if (!docRef) return;
   if (!verifyNichtArchiviert()) return;
   const name = reservationNameInput.value.trim();
-  const anzahl = parseInt(reservationAnzahlInput.value, 10);
   if (!name) { showToast("Bitte einen Gruppennamen eingeben."); return; }
-  if (!anzahl || anzahl < 1) { showToast("Bitte eine gültige Personenzahl eingeben."); return; }
+  const split = readGroupSplit(reservationAnzahlInput, reservationKinderInput);
+  if (!split) return;
   try {
-    await addDoc(collection(docRef, "reservierungen"), { name, anzahl, erstellt: serverTimestamp() });
+    await addDoc(collection(docRef, "reservierungen"), { name, ...split, erstellt: serverTimestamp() });
     reservationNameInput.value = "";
     reservationAnzahlInput.value = "";
+    reservationKinderInput.value = "";
   } catch (err) {
     showToast("Fehler: " + err.message);
   }
@@ -1568,7 +1590,8 @@ function openResEdit(target) {
   if (!r) return;
   resEditTarget = target;
   resEditNameInput.value = r.name;
-  resEditAnzahlInput.value = r.anzahl;
+  resEditAnzahlInput.value = resErw(r);
+  resEditKinderInput.value = resKin(r);
   resEditOverlay.classList.remove("hidden");
   resEditNameInput.focus();
 }
@@ -1581,19 +1604,19 @@ function closeResEdit() {
 async function saveResEdit() {
   if (!resEditTarget) return;
   const name = resEditNameInput.value.trim();
-  const anzahl = parseInt(resEditAnzahlInput.value, 10);
   if (!name) { showToast("Bitte einen Gruppennamen eingeben."); return; }
-  if (!anzahl || anzahl < 1) { showToast("Bitte eine gültige Personenzahl eingeben."); return; }
+  const split = readGroupSplit(resEditAnzahlInput, resEditKinderInput);
+  if (!split) return;
   if (resEditTarget.type === "new") {
     const r = pendingNewTripReservations[resEditTarget.index];
-    if (r) { r.name = name; r.anzahl = anzahl; }
+    if (r) Object.assign(r, { name }, split);
     closeResEdit();
     renderNewTripReservations();
     return;
   }
   if (!docRef || !verifyNichtArchiviert()) return;
   try {
-    await updateDoc(doc(collection(docRef, "reservierungen"), resEditTarget.id), { name, anzahl });
+    await updateDoc(doc(collection(docRef, "reservierungen"), resEditTarget.id), { name, ...split });
     closeResEdit();
     showToast("Reservierung aktualisiert.");
   } catch (err) {
@@ -1613,7 +1636,7 @@ function renderNewTripReservations() {
     li.className = "reservation-item";
     li.innerHTML = `
       <span class="reservation-name">${escapeHtml(r.name)}</span>
-      <span class="reservation-anzahl">${clamp0(r.anzahl)} Pers.</span>
+      <span class="reservation-anzahl">${resLabel(r)}</span>
       <button type="button" class="reservation-edit" data-edit-index="${i}" aria-label="Reservierung bearbeiten">✏️</button>
       <button type="button" class="reservation-remove" data-remove-index="${i}" aria-label="Reservierung entfernen">✕</button>
     `;
@@ -1632,17 +1655,18 @@ function renderNewTripReservations() {
 
 function addNewTripReservation() {
   const name = newTripResNameInput.value.trim();
-  const anzahl = parseInt(newTripResAnzahlInput.value, 10);
   if (!name) { showToast("Bitte einen Gruppennamen eingeben."); return; }
-  if (!anzahl || anzahl < 1) { showToast("Bitte eine gültige Personenzahl eingeben."); return; }
-  pendingNewTripReservations.push({ name, anzahl });
+  const split = readGroupSplit(newTripResAnzahlInput, newTripResKinderInput);
+  if (!split) return;
+  pendingNewTripReservations.push({ name, ...split });
   newTripResNameInput.value = "";
   newTripResAnzahlInput.value = "";
+  newTripResKinderInput.value = "";
   renderNewTripReservations();
 }
 function setConnStatus(state) { applyConnStatus(connStatus, state); }
 
-async function addFahrgaeste(kategorie, delta, hinweis, gruppenName) {
+async function addFahrgaeste(kategorie, delta, hinweis, gruppenName, split) {
   if (!docRef || !delta) return;
   if (!verifyNichtArchiviert()) return;
   try {
@@ -1652,6 +1676,7 @@ async function addFahrgaeste(kategorie, delta, hinweis, gruppenName) {
     };
     if (hinweis) eventData.hinweis = hinweis;
     if (gruppenName) eventData.gruppenName = gruppenName;
+    if (split) { eventData.erwachsene = split.erwachsene; eventData.kinder = split.kinder; }
     await addDoc(collection(docRef, "ereignisse"), eventData);
   } catch (err) {
     showToast("Fehler beim Speichern: " + err.message);
@@ -1709,13 +1734,13 @@ function buildFahrtBerichtHtml(events) {
   }).join("");
 
   const reservationRows = currentReservations.length
-    ? currentReservations.map((r) => `<tr><td>${escapeHtml(r.name)}</td><td class="num">${clamp0(r.anzahl)}</td></tr>`).join("")
-    : `<tr><td colspan="2" class="empty">Keine offenen Reservierungen</td></tr>`;
+    ? currentReservations.map((r) => `<tr><td>${escapeHtml(r.name)}</td><td class="num">${resErw(r)}</td><td class="num">${resKin(r)}</td><td class="num">${clamp0(r.anzahl)}</td></tr>`).join("")
+    : `<tr><td colspan="4" class="empty">Keine offenen Reservierungen</td></tr>`;
 
   const gruppenEvents = events.filter((e) => e.kategorie === "gruppen" && e.gruppenName && e.anzahl > 0);
   const gruppenRows = gruppenEvents.length
-    ? gruppenEvents.map((e) => `<tr><td>${escapeHtml(e.gruppenName)}</td><td>${formatTimeDE(e.zeit)}</td><td class="num">${e.anzahl}</td></tr>`).join("")
-    : `<tr><td colspan="3" class="empty">Keine namentlichen Gruppen erfasst</td></tr>`;
+    ? gruppenEvents.map((e) => `<tr><td>${escapeHtml(e.gruppenName)}</td><td>${formatTimeDE(e.zeit)}</td><td class="num">${e.erwachsene ?? e.anzahl}</td><td class="num">${e.kinder ?? 0}</td><td class="num">${e.anzahl}</td></tr>`).join("")
+    : `<tr><td colspan="5" class="empty">Keine namentlichen Gruppen erfasst</td></tr>`;
 
   const erstelltBerichtText = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date());
 
@@ -1773,13 +1798,13 @@ function buildFahrtBerichtHtml(events) {
 
   <h2>Gruppen (angekommen)</h2>
   <table>
-    <thead><tr><th>Gruppe</th><th>Uhrzeit</th><th class="num">Personen</th></tr></thead>
+    <thead><tr><th>Gruppe</th><th>Uhrzeit</th><th class="num">Erwachsene</th><th class="num">Kinder</th><th class="num">Gesamt</th></tr></thead>
     <tbody>${gruppenRows}</tbody>
   </table>
 
   <h2>Offene Reservierungen</h2>
   <table>
-    <thead><tr><th>Gruppe</th><th class="num">Personen</th></tr></thead>
+    <thead><tr><th>Gruppe</th><th class="num">Erwachsene</th><th class="num">Kinder</th><th class="num">Gesamt</th></tr></thead>
     <tbody>${reservationRows}</tbody>
   </table>
 
