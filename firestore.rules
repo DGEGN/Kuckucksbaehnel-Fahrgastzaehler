@@ -3,6 +3,11 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
+    // ===========================================================
+    // Gemeinsame Hilfsfunktionen (aus der Fahrgastzählapp,
+    // unverändert – gelten jetzt auch für die Kassenapp-Collections)
+    // ===========================================================
+
     // Ist das angemeldete Konto ein Admin? (Dokument wird ausschließlich
     // manuell in der Firebase-Konsole angelegt, siehe README.)
     function istAdmin() {
@@ -41,6 +46,28 @@ service cloud.firestore {
 
     function istFahrtArchiviert(fahrtId) {
       return istDatumArchiviert(get(/databases/$(database)/documents/fahrten/$(fahrtId)).data.fahrtag);
+    }
+
+    // Kassenapp-Collections (kassenbuch, berichte, verkaeufe) verwenden als
+    // Dokument-ID direkt den Fahrtag (z. B. "2026-09-01") – ohne Standort-
+    // oder Zug-Suffix, da Kassenbuch/Verkaufsbericht/Verkäufe gemeinsam für
+    // alle Kassen an diesem Fahrtag gelten. split('_')[0] liefert bei einer
+    // ID ohne "_" einfach die komplette ID zurück, funktioniert also sowohl
+    // für reine Fahrtag-IDs als auch für ältere IDs mit Suffix.
+    function istKassenDatumArchiviert(docId) {
+      // Kassenbücher/Berichte/Verkäufe sind ab Mitternacht (deutsche Zeit) des
+      // Fahrtags für Normalnutzer endgültig gesperrt ("Nachtsprung").
+      // Offset: Sommerzeit (Apr–Okt) = UTC+2, sonst UTC+1 (Näherung, Umstellungs-
+      // wochenenden weichen um max. 1 Stunde ab).
+      let teile = docId.split('_')[0].split('-');
+      let versatz = (int(teile[1]) >= 4 && int(teile[1]) <= 10) ? 2 : 1;
+      let tagesende = timestamp.date(int(teile[0]), int(teile[1]), int(teile[2])) + duration.value(24 - versatz, 'h');
+      return request.time >= tagesende;
+    }
+
+    // Zeitpunkt des letzten Kassenschnitts (null, wenn noch keiner erfolgte)
+    function schnittBis(kassenId) {
+      return get(/databases/$(database)/documents/kassenbuch/$(kassenId)).data.get('schnittBis', null);
     }
 
     // ---------------------------------------------------------
@@ -94,22 +121,34 @@ service cloud.firestore {
       allow delete: if istAdmin();
     }
 
+    // Globale App-Einstellungen. EIN Collection für beide Apps:
+    // - Dokument "global"  -> Sitzplatz-Puffer der Fahrgastzählapp
+    // - Dokumente "preise-neustadt" / "preise-lambrecht" / "preise-elmstein"
+    //   -> je Standort eigene Ticketpreise der Kassenapp
+    // Beide Dokumente werden ausschließlich von Admins im Admin-Bereich
+    // gepflegt; alle angemeldeten Konten dürfen lesen.
     // ---------------------------------------------------------
-    // Globale App-Einstellungen (z. B. Sitzplatz-Puffer in Prozent).
-    // Nur ein Dokument "global", von Admins im Admin-Bereich gepflegt.
-    // ---------------------------------------------------------
-    match /einstellungen/{docId} {
+    match /einstellungen/{einstellungId} {
       allow read: if request.auth != null;
 
       allow create, update: if istAdmin()
-        && request.resource.data.sitzplatzReservePct is int
-        && request.resource.data.sitzplatzReservePct >= 0
-        && request.resource.data.sitzplatzReservePct <= 99
-        && request.resource.data.neustadtReserveFuerLambrecht is int
-        && request.resource.data.neustadtReserveFuerLambrecht >= 0;
+        && (
+          (einstellungId == 'global'
+            && request.resource.data.sitzplatzReservePct is int
+            && request.resource.data.sitzplatzReservePct >= 0
+            && request.resource.data.sitzplatzReservePct <= 99
+            && request.resource.data.neustadtReserveFuerLambrecht is int
+            && request.resource.data.neustadtReserveFuerLambrecht >= 0)
+          || einstellungId != 'global'
+        );
 
       allow delete: if false;
     }
+
+    // ===========================================================
+    // Fahrgastzählapp (unverändert aus der bestehenden Datei –
+    // NICHT durch die ältere, rollenlose Kassenapp-Fassung ersetzen)
+    // ===========================================================
 
     // Eine Fahrt = ein Zug an einem Fahrtag (Dokument-ID: "YYYY-MM-DD_zug"),
     // gemeinsam gezählt für Neustadt UND Lambrecht (derselbe Zug, dieselben
@@ -163,8 +202,7 @@ service cloud.firestore {
 
         // Bestätigen/Entfernen läuft über Löschen (+ ggf. separate Zählung)
         allow delete: if istBearbeiter() && !istFahrtArchiviert(fahrtId);
-
-        // Bearbeiten (Name / abweichende Personenzahl) – nur diese beiden Felder
+        // Bearbeiten (Name / abweichende Personenzahl / Aufteilung)
         allow update: if istBearbeiter()
           && !istFahrtArchiviert(fahrtId)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'anzahl', 'erwachsene', 'kinder'])
@@ -173,6 +211,137 @@ service cloud.firestore {
           && request.resource.data.anzahl is int
           && request.resource.data.anzahl > 0;
       }
+    }
+
+    // ===========================================================
+    // Kassenapp – vier neue Collections (kassenbuch, berichte,
+    // verkaeufe, einstellungen/preise – Letztere siehe oben), an
+    // dieselben Rollen- und Archivierungsregeln wie "fahrten"
+    // angeglichen (statt nur request.auth != null wie im
+    // ursprünglichen Kassenapp-Entwurf). "fahrten" selbst legt die
+    // Kassenapp nie an, sondern liest nur und erhöht per increment()
+    // die Zählfelder – dafür gelten unverändert die Regeln oben.
+    // ===========================================================
+
+    // Kassenbuch je Fahrtag (Dokument-ID = Fahrtag, z. B. "2026-09-01"),
+    // gemeinsam für alle Kassen an diesem Tag
+    match /kassenbuch/{kassenId} {
+      allow read: if request.auth != null;
+
+      allow create: if istBearbeiter() && !istKassenDatumArchiviert(kassenId);
+
+      // Der Kassenschnitt-Zeitpunkt darf nur nach vorn wandern, nie zurück/gelöscht werden
+      allow update: if istBearbeiter() && !istKassenDatumArchiviert(kassenId)
+        && (!('schnittBis' in resource.data)
+            || ('schnittBis' in request.resource.data
+                && request.resource.data.schnittBis >= resource.data.schnittBis));
+
+      allow delete: if false;
+
+      // Einzelne Ein-/Auszahlungen. Storno geschieht per Update (nur die drei
+      // storniert*-Felder dürfen geändert werden) statt Löschen, damit die
+      // Buchung als nachvollziehbarer Beleg sichtbar bleibt.
+      match /buchungen/{buchungId} {
+        allow read: if request.auth != null;
+
+        allow create: if istBearbeiter()
+          && !istKassenDatumArchiviert(kassenId)
+          && request.resource.data.keys().hasAll(['typ', 'betrag', 'kasse', 'uid'])
+          && request.resource.data.uid == request.auth.uid
+          && request.resource.data.typ in ['einzahlung', 'auszahlung', 'kartenzahlung']
+          && request.resource.data.betrag is int
+          && request.resource.data.betrag >= 0;
+
+        // Storno: Admins alles, normale Nutzer nur eigene Buchungen; Buchungen vor
+        // einem Kassenschnitt sind festgeschrieben.
+        allow update: if istBearbeiter()
+          && !istKassenDatumArchiviert(kassenId)
+          && (istAdmin() || resource.data.get('uid', '') == request.auth.uid)
+          && (schnittBis(kassenId) == null || resource.data.zeit > schnittBis(kassenId))
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['storniert', 'storniertZeit', 'storniertVon']);
+
+        allow delete: if false;
+      }
+    }
+
+    // Verkaufsberichte je Fahrtag (Dokument-ID = Fahrtag), gemeinsam für alle Kassen
+    match /berichte/{berichtId} {
+      allow read: if request.auth != null;
+
+      allow create, update: if istBearbeiter() && !istKassenDatumArchiviert(berichtId);
+
+      allow delete: if false;
+    }
+
+    // Einzelne Verkäufe (Kassenbon-Positionen) je Fahrtag, gemeinsam für alle
+    // Kassen – Grundlage für den automatischen Vorschlag im Verkaufsbericht
+    match /verkaeufe/{verkaufId} {
+      allow read: if request.auth != null;
+
+      match /eintraege/{eintragId} {
+        allow read: if request.auth != null;
+
+        allow create: if istBearbeiter()
+          && !istKassenDatumArchiviert(verkaufId)
+          && request.resource.data.keys().hasAll(['ticket', 'anzahl', 'summe', 'kasse'])
+          && request.resource.data.anzahl is int
+          && request.resource.data.anzahl > 0;
+
+        allow update: if false;
+
+        // Löschen wird für "Rückgängig" benötigt
+        allow delete: if istBearbeiter() && !istKassenDatumArchiviert(verkaufId);
+      }
+    }
+
+    // Im Verkauf eingelöste Gutscheine je Fahrtag, gemeinsam für alle Kassen –
+    // Grundlage für die automatische Gutschein-Anzahl im Verkaufsbericht
+    match /gutscheine/{gutscheinId} {
+      allow read: if request.auth != null;
+
+      match /eintraege/{eintragId} {
+        allow read: if request.auth != null;
+
+        allow create: if istBearbeiter()
+          && !istKassenDatumArchiviert(gutscheinId)
+          && request.resource.data.keys().hasAll(['typ', 'anzahl', 'wert', 'kasse'])
+          && request.resource.data.typ in ['familie', 'einzelperson']
+          && request.resource.data.anzahl is int
+          && request.resource.data.anzahl > 0;
+
+        allow update: if false;
+        allow delete: if istBearbeiter() && !istKassenDatumArchiviert(gutscheinId);
+      }
+    }
+
+    // ===========================================================
+    // Revisionssicherheit: Änderungsprotokoll, Kassenschnitte und
+    // Tagesabschlüsse. Alle drei sind "append-only" – nach dem Anlegen
+    // weder änderbar noch löschbar (auch nicht für Admins).
+    // ===========================================================
+    match /aenderungslog/{logId} {
+      allow read: if request.auth != null;
+      allow create: if istBearbeiter()
+        && request.resource.data.keys().hasAll(['aktion', 'uid', 'kasse', 'fahrtag', 'standort'])
+        && request.resource.data.uid == request.auth.uid
+        && (request.resource.data.aktion != 'korrektur' || istAdmin());
+      allow update, delete: if false;
+    }
+
+    match /kassenschnitte/{docId}/schnitte/{schnittId} {
+      allow read: if request.auth != null;
+      allow create: if istBearbeiter() && !istKassenDatumArchiviert(docId)
+        && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Unveränderlicher Tagesabschluss ("Nachtsprung"): Schnappschuss des
+    // abgelaufenen Tages mit Prüfsumme. Darf erst nach Tagesende angelegt werden.
+    match /tagesabschluesse/{docId} {
+      allow read: if request.auth != null;
+      allow create: if istBearbeiter() && istKassenDatumArchiviert(docId)
+        && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
     }
   }
 }
