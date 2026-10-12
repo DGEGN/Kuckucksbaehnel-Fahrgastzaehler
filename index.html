@@ -578,6 +578,21 @@
   </div>
 </div>
 
+<!-- Reservierung bearbeiten -->
+<div id="resEditOverlay" class="dialog-overlay hidden">
+  <div class="dialog-card">
+    <p>Reservierte Gruppe bearbeiten</p>
+    <div class="res-edit-fields">
+      <input type="text" id="resEditName" placeholder="Gruppenname" maxlength="40">
+      <input type="number" id="resEditAnzahl" placeholder="Anzahl" min="1" step="1" inputmode="numeric">
+    </div>
+    <div class="dialog-actions">
+      <button type="button" id="resEditCancel" class="btn btn-ghost">Abbrechen</button>
+      <button type="button" id="resEditSave" class="btn btn-brass">Speichern</button>
+    </div>
+  </div>
+</div>
+
 <!-- Impressum -->
 <div id="impressumOverlay" class="dialog-overlay hidden">
   <div class="dialog-card impressum-card">

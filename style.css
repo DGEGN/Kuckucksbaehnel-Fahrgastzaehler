@@ -814,6 +814,17 @@ html[data-theme="classic"] .reservation-remove {
   flex-shrink: 0;
 }
 html[data-theme="classic"] .reservation-remove:hover { background: #f3d9d2; }
+html[data-theme="classic"] .reservation-edit {
+  background: none;
+  border: 1px solid var(--paper-dark);
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+html[data-theme="classic"] .reservation-edit:disabled { opacity: 0.4; cursor: not-allowed; }
+html[data-theme="classic"] .res-edit-fields { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 html[data-theme="classic"] .reservation-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
 html[data-theme="classic"] .reservation-add-row input {
   flex: 1;
@@ -1831,6 +1842,17 @@ html[data-theme="modern"] .reservation-remove {
   flex-shrink: 0;
 }
 html[data-theme="modern"] .reservation-remove:hover { background: var(--signal-red-bg); }
+html[data-theme="modern"] .reservation-edit {
+  background: none;
+  border: 1px solid var(--border-strong);
+  width: 26px; height: 26px;
+  border-radius: 50%;
+  font-size: 0.8rem;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+html[data-theme="modern"] .reservation-edit:disabled { opacity: 0.4; cursor: not-allowed; }
+html[data-theme="modern"] .res-edit-fields { display: flex; flex-direction: column; gap: 10px; margin-bottom: 16px; }
 html[data-theme="modern"] .reservation-add-row { display: flex; gap: 8px; flex-wrap: wrap; }
 html[data-theme="modern"] .reservation-add-row input {
   flex: 1;

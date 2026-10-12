@@ -163,7 +163,15 @@ service cloud.firestore {
 
         // Bestätigen/Entfernen läuft über Löschen (+ ggf. separate Zählung)
         allow delete: if istBearbeiter() && !istFahrtArchiviert(fahrtId);
-        allow update: if false;
+
+        // Bearbeiten (Name / abweichende Personenzahl) – nur diese beiden Felder
+        allow update: if istBearbeiter()
+          && !istFahrtArchiviert(fahrtId)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['name', 'anzahl'])
+          && request.resource.data.name is string
+          && request.resource.data.name.size() > 0
+          && request.resource.data.anzahl is int
+          && request.resource.data.anzahl > 0;
       }
     }
   }

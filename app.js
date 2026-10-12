@@ -17,7 +17,7 @@ import {
 // TODO: Hier deine eigene Firebase-Projektkonfiguration eintragen.
 // Firebase-Konsole -> Projekteinstellungen -> "Meine Apps" -> Web-App -> Konfiguration
 // Diese Werte sind KEINE Geheimnisse, Zugriffsschutz erfolgt über die
-// Firestore-Sicherheitsregeln (siehe firestore.rules / README.md)
+// Firestore-Sicherheitsregeln (siehe firestore.rules / README.md).
 // ---------------------------------------------------------
 const firebaseConfig = {
   apiKey: "AIzaSyCpfHTMh8zx2hmcxjF-ayIjW0lFtJcBtSM",
@@ -28,7 +28,6 @@ const firebaseConfig = {
   messagingSenderId: "732559401683",
   appId: "1:732559401683:web:dbfb8ef56c85c73de46a26"
 };
-
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
@@ -220,6 +219,12 @@ const reservationNameInput = el("reservationName");
 const reservationAnzahlInput = el("reservationAnzahl");
 const reservationAddBtn = el("reservationAdd");
 const newTripReservationsList = el("newTripReservationsList");
+const resEditOverlay = el("resEditOverlay");
+const resEditNameInput = el("resEditName");
+const resEditAnzahlInput = el("resEditAnzahl");
+const resEditSaveBtn = el("resEditSave");
+const resEditCancelBtn = el("resEditCancel");
+let resEditTarget = null; // { type: "live", id } | { type: "new", index }
 const newTripResNameInput = el("newTripResName");
 const newTripResAnzahlInput = el("newTripResAnzahl");
 const newTripResAddBtn = el("newTripResAdd");
@@ -875,6 +880,8 @@ function initSetupScreen() {
   renderNewTripReservations();
   newTripResAddBtn.addEventListener("click", addNewTripReservation);
   reservationAddBtn.addEventListener("click", addReservation);
+  resEditCancelBtn.addEventListener("click", closeResEdit);
+  resEditSaveBtn.addEventListener("click", saveResEdit);
 
   startBtn.addEventListener("click", startSession);
   toggleNewTripBtn.addEventListener("click", () => setNewTripVisible(!newTripVisible));
@@ -1498,6 +1505,7 @@ function renderReservationsList() {
     li.innerHTML = `
       <span class="reservation-name">${escapeHtml(r.name)}</span>
       <span class="reservation-anzahl">${clamp0(r.anzahl)} Pers.</span>
+      <button type="button" class="reservation-edit" data-edit="${r.id}" aria-label="Reservierung bearbeiten" ${gesperrt ? "disabled" : ""}>✏️</button>
       <button type="button" class="btn btn-brass btn-small" data-confirm="${r.id}" ${gesperrt ? "disabled" : ""}>✓ Angekommen</button>
       <button type="button" class="reservation-remove" data-remove="${r.id}" aria-label="Reservierung entfernen" ${gesperrt ? "disabled" : ""}>✕</button>
     `;
@@ -1505,6 +1513,9 @@ function renderReservationsList() {
   });
   reservationsList.querySelectorAll("[data-confirm]").forEach((btn) => {
     btn.addEventListener("click", () => confirmReservation(btn.dataset.confirm));
+  });
+  reservationsList.querySelectorAll("[data-edit]").forEach((btn) => {
+    btn.addEventListener("click", () => openResEdit({ type: "live", id: btn.dataset.edit }));
   });
   reservationsList.querySelectorAll("[data-remove]").forEach((btn) => {
     btn.addEventListener("click", () => removeReservation(btn.dataset.remove));
@@ -1517,7 +1528,7 @@ async function confirmReservation(resId) {
   if (!verifyNichtArchiviert()) return;
   try {
     await deleteDoc(doc(collection(docRef, "reservierungen"), resId));
-    await addFahrgaeste("gruppen", clamp0(res.anzahl), `Reservierung: ${res.name}`);
+    await addFahrgaeste("gruppen", clamp0(res.anzahl), `Reservierung: ${res.name}`, res.name);
     showToast(`„${res.name}" bestätigt (+${res.anzahl} zur Gruppe).`);
   } catch (err) {
     showToast("Fehler: " + err.message);
@@ -1550,6 +1561,46 @@ async function addReservation() {
   }
 }
 
+function openResEdit(target) {
+  const r = target.type === "live"
+    ? currentReservations.find((x) => x.id === target.id)
+    : pendingNewTripReservations[target.index];
+  if (!r) return;
+  resEditTarget = target;
+  resEditNameInput.value = r.name;
+  resEditAnzahlInput.value = r.anzahl;
+  resEditOverlay.classList.remove("hidden");
+  resEditNameInput.focus();
+}
+
+function closeResEdit() {
+  resEditOverlay.classList.add("hidden");
+  resEditTarget = null;
+}
+
+async function saveResEdit() {
+  if (!resEditTarget) return;
+  const name = resEditNameInput.value.trim();
+  const anzahl = parseInt(resEditAnzahlInput.value, 10);
+  if (!name) { showToast("Bitte einen Gruppennamen eingeben."); return; }
+  if (!anzahl || anzahl < 1) { showToast("Bitte eine gültige Personenzahl eingeben."); return; }
+  if (resEditTarget.type === "new") {
+    const r = pendingNewTripReservations[resEditTarget.index];
+    if (r) { r.name = name; r.anzahl = anzahl; }
+    closeResEdit();
+    renderNewTripReservations();
+    return;
+  }
+  if (!docRef || !verifyNichtArchiviert()) return;
+  try {
+    await updateDoc(doc(collection(docRef, "reservierungen"), resEditTarget.id), { name, anzahl });
+    closeResEdit();
+    showToast("Reservierung aktualisiert.");
+  } catch (err) {
+    showToast("Fehler: " + err.message);
+  }
+}
+
 // --- Vorreservierte Gruppen beim Anlegen einer NEUEN Fahrt (noch ohne docRef) ---
 function renderNewTripReservations() {
   if (!pendingNewTripReservations.length) {
@@ -1563,9 +1614,13 @@ function renderNewTripReservations() {
     li.innerHTML = `
       <span class="reservation-name">${escapeHtml(r.name)}</span>
       <span class="reservation-anzahl">${clamp0(r.anzahl)} Pers.</span>
+      <button type="button" class="reservation-edit" data-edit-index="${i}" aria-label="Reservierung bearbeiten">✏️</button>
       <button type="button" class="reservation-remove" data-remove-index="${i}" aria-label="Reservierung entfernen">✕</button>
     `;
     newTripReservationsList.appendChild(li);
+  });
+  newTripReservationsList.querySelectorAll("[data-edit-index]").forEach((btn) => {
+    btn.addEventListener("click", () => openResEdit({ type: "new", index: parseInt(btn.dataset.editIndex, 10) }));
   });
   newTripReservationsList.querySelectorAll("[data-remove-index]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1587,7 +1642,7 @@ function addNewTripReservation() {
 }
 function setConnStatus(state) { applyConnStatus(connStatus, state); }
 
-async function addFahrgaeste(kategorie, delta, hinweis) {
+async function addFahrgaeste(kategorie, delta, hinweis, gruppenName) {
   if (!docRef || !delta) return;
   if (!verifyNichtArchiviert()) return;
   try {
@@ -1596,6 +1651,7 @@ async function addFahrgaeste(kategorie, delta, hinweis) {
       kategorie, anzahl: delta, kasse: session.kasse, standort: session.standort, zeit: serverTimestamp()
     };
     if (hinweis) eventData.hinweis = hinweis;
+    if (gruppenName) eventData.gruppenName = gruppenName;
     await addDoc(collection(docRef, "ereignisse"), eventData);
   } catch (err) {
     showToast("Fehler beim Speichern: " + err.message);
@@ -1656,6 +1712,11 @@ function buildFahrtBerichtHtml(events) {
     ? currentReservations.map((r) => `<tr><td>${escapeHtml(r.name)}</td><td class="num">${clamp0(r.anzahl)}</td></tr>`).join("")
     : `<tr><td colspan="2" class="empty">Keine offenen Reservierungen</td></tr>`;
 
+  const gruppenEvents = events.filter((e) => e.kategorie === "gruppen" && e.gruppenName && e.anzahl > 0);
+  const gruppenRows = gruppenEvents.length
+    ? gruppenEvents.map((e) => `<tr><td>${escapeHtml(e.gruppenName)}</td><td>${formatTimeDE(e.zeit)}</td><td class="num">${e.anzahl}</td></tr>`).join("")
+    : `<tr><td colspan="3" class="empty">Keine namentlichen Gruppen erfasst</td></tr>`;
+
   const erstelltBerichtText = new Intl.DateTimeFormat("de-DE", { dateStyle: "medium", timeStyle: "short" }).format(new Date());
 
   return `<!DOCTYPE html>
@@ -1709,6 +1770,12 @@ function buildFahrtBerichtHtml(events) {
     <div class="stat-box"><span class="n">${free}</span><span class="l">Frei</span></div>
     <div class="stat-box"><span class="n">${auslastung}%</span><span class="l">Auslastung</span></div>
   </div>
+
+  <h2>Gruppen (angekommen)</h2>
+  <table>
+    <thead><tr><th>Gruppe</th><th>Uhrzeit</th><th class="num">Personen</th></tr></thead>
+    <tbody>${gruppenRows}</tbody>
+  </table>
 
   <h2>Offene Reservierungen</h2>
   <table>
