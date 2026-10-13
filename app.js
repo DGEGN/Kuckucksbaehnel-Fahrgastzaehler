@@ -20,7 +20,6 @@ import {
 // Firestore-Sicherheitsregeln (siehe firestore.rules / README.md).
 // ---------------------------------------------------------
 const firebaseConfig = {
-const firebaseConfig = {
   apiKey: "AIzaSyCpfHTMh8zx2hmcxjF-ayIjW0lFtJcBtSM",
   authDomain: "kuckuck-fahrkarten.firebaseapp.com",
   databaseURL: "https://kuckuck-fahrkarten-default-rtdb.europe-west1.firebasedatabase.app",
