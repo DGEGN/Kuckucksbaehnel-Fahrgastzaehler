@@ -20,13 +20,12 @@ import {
 // Firestore-Sicherheitsregeln (siehe firestore.rules / README.md).
 // ---------------------------------------------------------
 const firebaseConfig = {
-  apiKey: "AIzaSyCpfHTMh8zx2hmcxjF-ayIjW0lFtJcBtSM",
-  authDomain: "kuckuck-fahrkarten.firebaseapp.com",
-  databaseURL: "https://kuckuck-fahrkarten-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "kuckuck-fahrkarten",
-  storageBucket: "kuckuck-fahrkarten.firebasestorage.app",
-  messagingSenderId: "732559401683",
-  appId: "1:732559401683:web:dbfb8ef56c85c73de46a26"
+  apiKey: "DEIN_API_KEY",
+  authDomain: "DEIN_PROJEKT.firebaseapp.com",
+  projectId: "DEIN_PROJEKT",
+  storageBucket: "DEIN_PROJEKT.appspot.com",
+  messagingSenderId: "DEINE_SENDER_ID",
+  appId: "DEINE_APP_ID"
 };
 
 const firebaseApp = initializeApp(firebaseConfig);
@@ -357,7 +356,7 @@ function initAuthScreen() {
 
   openImpressumBtns.forEach((btn) => btn.addEventListener("click", () => impressumOverlay.classList.remove("hidden")));
   impressumCloseBtn.addEventListener("click", () => impressumOverlay.classList.add("hidden"));
-  fullOverlayCloseBtn.addEventListener("click", () => fullOverlay.classList.add("hidden"));
+  fullOverlayCloseBtn.addEventListener("click", () => { fullOverlay.classList.add("hidden"); stopAlertSound(); });
 
   onAuthStateChanged(auth, (user) => { firebaseUser = user; });
 }
@@ -1379,7 +1378,26 @@ function applyWarningClasses(el, level) {
 // ---------------------------------------------------------
 // Vollbesetzt-Warnung (Popup + Ton bei 100 % Belegung)
 // ---------------------------------------------------------
+const alertAudio = new Audio("assets/sounds/voll-besetzt.mp3");
+alertAudio.preload = "auto";
+
+function stopAlertSound() {
+  try { alertAudio.pause(); alertAudio.currentTime = 0; } catch (e) { /* ignorieren */ }
+}
+
 function playAlertSound() {
+  // Bevorzugt der Schulgong aus der Audiodatei; bei Fehlern (Autoplay-Sperre,
+  // Datei nicht ladbar) greift der einfache Piepton als Rückfall.
+  try {
+    alertAudio.currentTime = 0;
+    const p = alertAudio.play();
+    if (p && typeof p.catch === "function") p.catch(() => playFallbackBeep());
+    return;
+  } catch (e) { /* weiter zum Rückfall */ }
+  playFallbackBeep();
+}
+
+function playFallbackBeep() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const now = ctx.currentTime;

@@ -468,3 +468,8 @@ Bedienoberfläche.
 - Ein Bearbeiter-Konto sperren: entweder im Admin-Bereich der App auf
   "Sperren" tippen, oder in der Firebase-Konsole unter *Authentication →
   Users* das Konto deaktivieren/löschen.
+
+
+## Ton bei 100 % Belegung
+
+Beim Erreichen von 100 % wird `assets/sounds/voll-besetzt.mp3` (Schulgong, ca. 5 Sekunden) abgespielt. Zum Austauschen einfach die Datei ersetzen (gleicher Name). Schlägt das Abspielen fehl, ertönt ein einfacher Piepton. Wird das Popup mit „OK“ geschlossen, stoppt der Ton sofort.
