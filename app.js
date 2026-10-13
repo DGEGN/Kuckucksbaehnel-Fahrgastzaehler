@@ -20,14 +20,14 @@ import {
 // Firestore-Sicherheitsregeln (siehe firestore.rules / README.md).
 // ---------------------------------------------------------
 const firebaseConfig = {
-  apiKey: "AIzaSyCpfHTMh8zx2hmcxjF-ayIjW0lFtJcBtSM",
-  authDomain: "kuckuck-fahrkarten.firebaseapp.com",
-  databaseURL: "https://kuckuck-fahrkarten-default-rtdb.europe-west1.firebasedatabase.app",
-  projectId: "kuckuck-fahrkarten",
-  storageBucket: "kuckuck-fahrkarten.firebasestorage.app",
-  messagingSenderId: "732559401683",
-  appId: "1:732559401683:web:dbfb8ef56c85c73de46a26"
+  apiKey: "DEIN_API_KEY",
+  authDomain: "DEIN_PROJEKT.firebaseapp.com",
+  projectId: "DEIN_PROJEKT",
+  storageBucket: "DEIN_PROJEKT.appspot.com",
+  messagingSenderId: "DEINE_SENDER_ID",
+  appId: "DEINE_APP_ID"
 };
+
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
@@ -883,8 +883,8 @@ function initSetupScreen() {
   renderNewTripReservations();
   newTripResAddBtn.addEventListener("click", addNewTripReservation);
   reservationAddBtn.addEventListener("click", addReservation);
-  resEditCancelBtn.addEventListener("click", closeResEdit);
-  resEditSaveBtn.addEventListener("click", saveResEdit);
+  resEditCancelBtn?.addEventListener("click", closeResEdit);
+  resEditSaveBtn?.addEventListener("click", saveResEdit);
 
   startBtn.addEventListener("click", startSession);
   toggleNewTripBtn.addEventListener("click", () => setNewTripVisible(!newTripVisible));
@@ -1570,7 +1570,7 @@ async function removeReservation(resId) {
 // Liest Erwachsene/Kinder aus zwei Feldern; null bei ungültiger Eingabe
 function readGroupSplit(erwInput, kinInput) {
   const erwachsene = parseInt(erwInput.value, 10) || 0;
-  const kinder = parseInt(kinInput.value, 10) || 0;
+  const kinder = parseInt(kinInput?.value, 10) || 0;
   if (erwachsene < 0 || kinder < 0 || erwachsene + kinder < 1) {
     showToast("Bitte Erwachsene und/oder Kinder (mind. 1 Person) eingeben.");
     return null;
@@ -1595,7 +1595,7 @@ async function addReservation() {
     await addDoc(collection(docRef, "reservierungen"), { name, ...split, erstellt: serverTimestamp() });
     reservationNameInput.value = "";
     reservationAnzahlInput.value = "";
-    reservationKinderInput.value = "";
+    if (reservationKinderInput) reservationKinderInput.value = "";
   } catch (err) {
     showToast("Fehler: " + err.message);
   }
@@ -1609,13 +1609,13 @@ function openResEdit(target) {
   resEditTarget = target;
   resEditNameInput.value = r.name;
   resEditAnzahlInput.value = resErw(r);
-  resEditKinderInput.value = resKin(r);
-  resEditOverlay.classList.remove("hidden");
+  if (resEditKinderInput) resEditKinderInput.value = resKin(r);
+  resEditOverlay?.classList.remove("hidden");
   resEditNameInput.focus();
 }
 
 function closeResEdit() {
-  resEditOverlay.classList.add("hidden");
+  resEditOverlay?.classList.add("hidden");
   resEditTarget = null;
 }
 
@@ -1679,7 +1679,7 @@ function addNewTripReservation() {
   pendingNewTripReservations.push({ name, ...split });
   newTripResNameInput.value = "";
   newTripResAnzahlInput.value = "";
-  newTripResKinderInput.value = "";
+  if (newTripResKinderInput) newTripResKinderInput.value = "";
   renderNewTripReservations();
 }
 function setConnStatus(state) { applyConnStatus(connStatus, state); }
