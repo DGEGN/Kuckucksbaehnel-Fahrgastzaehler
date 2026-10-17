@@ -1381,6 +1381,7 @@ function applyWarningClasses(el, level) {
 // ---------------------------------------------------------
 const alertAudio = new Audio("assets/sounds/voll-besetzt.mp3");
 alertAudio.preload = "auto";
+alertAudio.loop = true; // Dauerschleife, bis das Popup geschlossen wird
 
 function stopAlertSound() {
   try { alertAudio.pause(); alertAudio.currentTime = 0; } catch (e) { /* ignorieren */ }
@@ -1416,6 +1417,12 @@ function playFallbackBeep() {
     });
   } catch (e) { /* Ton ist optional (z. B. Autoplay-Einschränkungen) – Fehler ignorieren */ }
 }
+
+// Ton stoppt automatisch, sobald das Popup auf irgendeinem Weg verschwindet
+// (OK-Button, Fahrtwechsel, Zurücksetzen, Abmelden …).
+new MutationObserver(() => {
+  if (fullOverlay.classList.contains("hidden")) stopAlertSound();
+}).observe(fullOverlay, { attributes: true, attributeFilter: ["class"] });
 
 function triggerFullAlert() {
   playAlertSound();
